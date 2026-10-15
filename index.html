@@ -432,6 +432,7 @@ input[type=range]{width:100%; accent-color:var(--blue); height:22px;}
 .rank-row.school{justify-content:space-between}
 .rank-row.school.my-class{border-color:rgba(47,111,237,.5);background:rgba(47,111,237,.08)}
 .qa-lab span{background:rgba(46,204,113,.12)}.qa-test span{background:rgba(47,111,237,.15)}.qa-score span{background:rgba(255,176,32,.13)}.qa-chat span{background:rgba(174,123,255,.13)}.qa-notif span{background:rgba(255,92,92,.13)}
+.qa-rank{border-color:rgba(255,196,58,.32);background:linear-gradient(145deg,rgba(255,190,45,.12),rgba(255,255,255,.025))}.qa-rank span{background:linear-gradient(145deg,rgba(255,196,58,.28),rgba(255,140,0,.14));border:1px solid rgba(255,196,58,.35);box-shadow:0 3px 12px rgba(255,180,35,.12);font-size:21px}.qa-rank b{color:#ffd166}.qa-rank:hover{border-color:rgba(255,196,58,.75)}
 .dashboard-card{scroll-margin-top:76px}.card-head-row{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}.card-icon{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;background:rgba(255,255,255,.055);border:1px solid var(--line);font-size:18px}.dashboard-card h2{margin-top:3px}.school-grade-preview{margin-top:12px}.journey-line{height:8px;background:rgba(255,255,255,.08);border-radius:99px;overflow:hidden;margin-top:12px}.journey-line span{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--blue),var(--gold));border-radius:99px;transition:width .35s ease}.journey-label{display:flex;justify-content:space-between;color:var(--ink-dim);font-size:10.5px;margin:6px 0 12px}.journey-label b{color:#ffd166}
 .bottom-nav{position:fixed;left:50%;bottom:max(8px,env(safe-area-inset-bottom));transform:translateX(-50%);z-index:30;width:min(720px,calc(100% - 20px));display:grid;grid-template-columns:repeat(5,1fr);padding:7px;border:1px solid rgba(255,255,255,.12);border-radius:19px;background:rgba(5,11,26,.88);backdrop-filter:blur(18px);box-shadow:0 14px 40px rgba(0,0,0,.45)}.bottom-nav-item{border:0;background:transparent;color:#8794b6;padding:6px 3px;border-radius:13px;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:9px;cursor:pointer}.bottom-nav-item span{font-size:17px;line-height:1}.bottom-nav-item b{font-size:9px}.bottom-nav-item.active{color:#ffd166;background:rgba(240,182,39,.1)}
 .dash-modal{position:fixed;inset:0;z-index:100}.dash-modal-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.72);backdrop-filter:blur(5px)}.dash-modal-sheet{position:absolute;left:50%;bottom:0;transform:translateX(-50%);width:min(720px,100%);max-height:88vh;overflow:auto;padding:18px 16px calc(24px + env(safe-area-inset-bottom));border:1px solid rgba(255,255,255,.12);border-bottom:0;border-radius:24px 24px 0 0;background:linear-gradient(180deg,#102043,#071226);box-shadow:0 -20px 60px rgba(0,0,0,.45)}.dash-modal-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}.dash-modal-sheet h2{margin:3px 0 0}.dash-modal-sheet .chat-thread{max-height:45vh}
@@ -757,7 +758,7 @@ img,canvas,video,iframe{max-width:100%}
       <button class="quick-action qa-score" onclick="openDashboardSection('performance-card')"><span>📊</span><b>Desempenho</b><small>Notas e evolução</small></button>
       <button class="quick-action qa-chat" onclick="openStudentChat()"><span>💬</span><b>Chat</b><small>Falar com o professor</small></button>
       <button class="quick-action qa-notif" onclick="openDashboardSection('notifications-card')"><span>🔔</span><b>Notificações</b><small>Avisos importantes</small></button>
-      <button class="quick-action qa-rank" onclick="openDashboardSection('ranking-card')"><span>🏆</span><b>Ranking</b><small>Os melhores da turma e da escola</small></button>
+      <button class="quick-action qa-rank" onclick="openDashboardSection('ranking-card')" aria-label="Abrir Ranking"><span aria-hidden="true">🏆</span><b>Ranking</b><small>Os melhores da turma e da escola</small></button>
     </div>
     </div>
 
@@ -874,6 +875,11 @@ img,canvas,video,iframe{max-width:100%}
       <div class="eyebrow">Análise pedagógica</div>
       <div id="teacher-analytics" class="teacher-analytics"></div>
     </div>
+    <div class="gcard" id="rivior-progress-card">
+      <div class="eyebrow">📊 Acompanhamento</div><h2>Progresso dos alunos</h2>
+      <p class="lead">Resumo das notas registadas por classe e aluno.</p>
+      <div id="rivior-progress-summary"></div>
+    </div>
     <div class="gcard">
       <div class="eyebrow">☁️ Sincronização</div>
       <h2>Dados entre telemóveis</h2>
@@ -900,7 +906,7 @@ img,canvas,video,iframe{max-width:100%}
       <p class="lead">Escolhe quem vai receber: todos, só uma classe, ou um aluno em particular.</p>
       <label>Destinatário</label>
       <select id="notif-alvo-tipo" onchange="toggleNotifIndividual()">
-        <option value="todos">Todos os alunos</option>
+        <option value="todos">Todos os alunos (7.ª, 8.ª e 9.ª)</option>
         <option value="turma-7">Só 7.ª Classe</option>
         <option value="turma-8">Só 8.ª Classe</option>
         <option value="turma-9">Só 9.ª Classe</option>
@@ -1334,7 +1340,8 @@ function chatBubblesHtml(alunoId, verDoLadoDe){
     var meu = m.autor === verDoLadoDe;
     var d = new Date(m.data);
     return '<div class="chat-bubble ' + (meu?'mine':'theirs') + '">' + esc(m.texto) +
-      '<span class="chat-time">' + d.toLocaleDateString('pt-PT') + ' · ' + d.toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit'}) + '</span></div>';
+      '<span class="chat-time">' + d.toLocaleDateString('pt-PT') + ' · ' + d.toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit'}) + '</span>' +
+      '<button type="button" class="btn ghost small" style="margin-top:6px" onclick="deleteRiviorMessage(\''+m.id+'\')">Apagar mensagem</button></div>';
   }).join('');
 }
 function studentSendMessage(){
@@ -1433,9 +1440,9 @@ function toggleNotifIndividual(){
 }
 function renderNotifIndividualOptions(){
   var sel = el('notif-individual-select'); if(!sel) return;
-  var students = allStudents().filter(function(s){ return s.classe === TEACHER_CLASS; }).sort(function(a,b){ return a.nome.localeCompare(b.nome); });
+  var students = allStudents().filter(function(s){ return ['7','8','9'].indexOf(String(s.classe))>=0; }).sort(function(a,b){ return String(a.classe).localeCompare(String(b.classe)) || a.nome.localeCompare(b.nome,'pt'); });
   sel.innerHTML = students.length
-    ? students.map(function(s){ return '<option value="' + s.id + '">' + esc(s.nome) + (s.turma ? ' (Turma ' + esc(s.turma) + ')' : '') + '</option>'; }).join('')
+    ? students.map(function(s){ return '<option value="' + s.id + '">' + esc(s.nome) + ' ('+esc(s.classe)+'.ª Classe'+(s.turma ? ', Turma ' + esc(s.turma) : '')+')' + '</option>'; }).join('')
     : '<option value="">Nenhum aluno nesta classe ainda</option>';
 }
 function teacherSendNotification(){
@@ -1453,20 +1460,36 @@ function teacherSendNotification(){
 }
 function renderNotifHistory(){
   var box = el('notif-history'); if(!box) return;
-  var list = ensureNotifs().slice().sort(function(a,b){ return b.data - a.data; }).slice(0, 15);
-  if(!list.length){ box.innerHTML = '<div class="lead">Ainda não enviaste nenhuma notificação.</div>'; return; }
-  box.innerHTML = '<div class="eyebrow" style="margin-bottom:6px">Últimas enviadas</div>' + list.map(function(n){
-    var tag = n.tipo === 'todos' ? 'Todos' : n.tipo === 'turma' ? (n.alvo + '.ª Classe') : ((getStudentById(n.alvo) || {}).nome || 'Aluno removido');
-    var nC = (n.comentarios||[]).length, nL = (n.likes||[]).length;
-    var engajamento = (nL||nC) ? ' · 👍'+nL+' 💬'+nC : '';
-    var comentariosHtml = (n.comentarios||[]).map(function(c){ return '<div class="notif-comment"><b>'+esc(c.autorNome)+':</b> '+esc(c.texto)+'</div>'; }).join('');
-    return '<div class="bt-row" ' + (nC?('onclick="toggleCommentBox(\''+n.id+'\')" style="cursor:pointer"'):'') + '><span class="tn">' + esc(n.texto.length > 46 ? n.texto.slice(0,46) + '…' : n.texto) + esc(engajamento) + '</span><span class="tp">' + esc(tag) + '</span></div>'
-      + (nC ? '<div class="notif-comments hidden" id="comments-'+n.id+'">'+comentariosHtml+'</div>' : '');
+  var list = ensureNotifs().slice().sort(function(a,b){ return b.data - a.data; }).slice(0, 30);
+  if(!list.length){ box.innerHTML = '<div class="lead">Ainda não enviaste nenhum comunicado.</div>'; return; }
+  function studentName(id){ var st=getStudentById(id); return st ? st.nome : (id || 'Aluno desconhecido'); }
+  box.innerHTML = '<div class="eyebrow" style="margin-bottom:6px">Comunicados enviados — acompanhamento</div>' + list.map(function(n){
+    n.lidaPor = Array.isArray(n.lidaPor) ? n.lidaPor : [];
+    n.likes = Array.isArray(n.likes) ? n.likes : [];
+    n.comentarios = Array.isArray(n.comentarios) ? n.comentarios : [];
+    var tag = n.tipo === 'todos' ? 'Todas as classes (7.ª–9.ª)' : n.tipo === 'turma' ? (n.alvo + '.ª Classe') : ((getStudentById(n.alvo) || {}).nome || 'Aluno específico');
+    var views = n.lidaPor.map(studentName);
+    var reacts = n.likes.map(studentName);
+    var commentsHtml = n.comentarios.map(function(c){
+      var dt = c.data ? new Date(c.data).toLocaleString('pt-PT') : '';
+      return '<div class="notif-comment"><b>'+esc(c.autorNome || studentName(c.autorId))+'</b> '+(dt?'· '+esc(dt):'')+'<br>'+esc(c.texto)+'</div>';
+    }).join('') || '<div class="notif-comment dim">Ainda sem comentários.</div>';
+    var d = new Date(n.data);
+    var detailId = 'notif-report-' + String(n.id).replace(/[^a-zA-Z0-9_-]/g,'');
+    return '<div class="gcard" style="margin:10px 0;padding:12px"><div class="notif-tag">'+esc(tag)+'</div><div class="notif-text">'+esc(n.texto)+'</div><div class="notif-date">Enviado: '+d.toLocaleString('pt-PT')+'</div>'+
+      '<div class="lead" style="margin:8px 0">👁️ Visto por '+views.length+' · 👍 '+reacts.length+' reação(ões) · 💬 '+n.comentarios.length+' comentário(s)</div>'+
+      '<button class="btn ghost small" type="button" onclick="toggleNotifReport(\''+detailId+'\')">Ver quem viu, reagiu e comentou</button>'+
+      '<div id="'+detailId+'" class="hidden" style="margin-top:10px">'+
+      '<p><b>👁️ Viram ('+views.length+')</b><br>'+esc(views.join(', ') || 'Ainda ninguém.')+'</p>'+
+      '<p><b>👍 Reagiram ('+reacts.length+')</b><br>'+esc(reacts.join(', ') || 'Ainda ninguém.')+'</p>'+
+      '<p><b>💬 Comentários ('+n.comentarios.length+')</b></p>'+commentsHtml+'</div></div>';
   }).join('');
 }
+function toggleNotifReport(id){ var node=el(id); if(node) node.classList.toggle('hidden'); }
+window.toggleNotifReport = toggleNotifReport;
 function renderTeacherMessages(){
   var box = el('teacher-msgs'); if(!box) return;
-  var all = ensureMensagensAlunos().filter(function(m){ return m.classe===TEACHER_CLASS; });
+  var all = ensureMensagensAlunos().filter(function(m){ return ['7','8','9'].indexOf(String(m.classe))>=0; });
   if(!all.length){ box.innerHTML = '<div class="lead">Ainda não há conversas com alunos desta classe.</div>'; return; }
   var porAluno = {};
   all.forEach(function(m){ if(!porAluno[m.alunoId]) porAluno[m.alunoId]=[]; porAluno[m.alunoId].push(m); });
@@ -1797,6 +1820,32 @@ function renderStudentRanking(){
   });
   body2.innerHTML = champHtml;
 }
+function renderRiviorProgress(){
+  var box=el('rivior-progress-summary'); if(!box) return;
+  var students=allStudents().slice().sort(function(a,b){return String(a.classe).localeCompare(String(b.classe))||String(a.nome).localeCompare(String(b.nome),'pt');});
+  if(!students.length){box.innerHTML='<p class="lead">Ainda não há alunos registados.</p>';return;}
+  var html='';
+  ['7','8','9'].forEach(function(cls){
+    var group=students.filter(function(st){return String(st.classe)===cls;}); if(!group.length)return;
+    html+='<h3>'+cls+'.ª Classe ('+group.length+' alunos)</h3><div class="student-list">';
+    group.forEach(function(st){
+      var avgs=[]; [1,2,3].forEach(function(t){var a=gradeAvg((st.trimestres&&st.trimestres[t])||[]);if(a!==null)avgs.push(a);});
+      var avg=avgs.length?avgs.reduce(function(a,b){return a+b},0)/avgs.length:null;
+      var label=avg===null?'Sem notas':(avg>=10?'Aprovado na média registada':'Precisa de apoio');
+      html+='<div class="bt-row"><span class="tn"><b>'+esc(st.nome||'Aluno')+'</b><br><span style="font-weight:400">Turma '+esc(st.turma||'—')+' · '+(avg===null?'Sem notas':('Média: '+fmt(avg,1)))+'</span></span><span class="tp">'+label+'</span></div>';
+    }); html+='</div>';
+  }); box.innerHTML=html;
+}
+function deleteRiviorMessage(id){
+  var arr=ensureMensagensAlunos(), i=arr.findIndex(function(m){return m.id===id;}); if(i<0)return;
+  if(!confirm('Apagar esta mensagem? Esta ação não pode ser desfeita.'))return;
+  arr.splice(i,1); saveStore(); if(typeof cloudPush==='function')cloudPush();
+  renderStudentMsgBox(); renderTeacherMessages();
+  var sid=(store.perfil&&store.perfil.role==='student')?getCurrentStudent():null;
+  if(sid && typeof renderStudentMsgBox==='function')renderStudentMsgBox();
+  if(typeof openStudentProfile==='function' && window._riviorLastChatStudent)openStudentProfile(window._riviorLastChatStudent);
+}
+window.deleteRiviorMessage=deleteRiviorMessage;
 function openTeacherPanel(){
   if(!store.perfil || store.perfil.role!=='teacher') { logout(); return; }
   hide('view-login'); hide('view-dash'); hide('view-tema'); hide('view-licao'); hide('view-quiz'); hide('view-exp'); show('view-teacher'); showBG('universe');
@@ -1814,6 +1863,7 @@ function renderTeacherPanel(){
   el('teacher-stats').innerHTML='<div class="tstat"><b>'+students.length+'</b><span>ALUNOS</span></div><div class="tstat"><b>'+ (avg===null?'—':fmt(avg,1))+'</b><span>MÉDIA DA TURMA</span></div><div class="tstat"><b>'+alertas+'</b><span>ABAIXO DE 10</span></div>';
   el('teacher-list-title').textContent=TEACHER_CLASS+'.ª Classe · '+TEACHER_TERM+'º Trimestre';
   renderTeacherStudents();
+  renderRiviorProgress();
   renderTeacherAnalytics(students,avg,aprov,alertas,semNotas);
   if(el('notif-individual-wrap') && !el('notif-individual-wrap').classList.contains('hidden')) renderNotifIndividualOptions();
   renderNotifHistory();
@@ -2396,7 +2446,8 @@ function generateLicaoDiag(classe,ti,li){
        'Trocar o assunto por um tema que ainda não foi estudado.'],0,
       'A resposta deve aplicar o objetivo específico desta lição: '+obj[j]+'.'));
   }
-  return shuffle(selected).slice(0,5);
+  var unique=[], fingerprints={}; selected.forEach(function(q){var k=String(q.q||q.pergunta||'').toLowerCase().replace(/[^a-z0-9áàâãéêíóôõúç]+/g,' ').trim(); if(k && !fingerprints[k]){fingerprints[k]=1;unique.push(q);}});
+  return shuffle(unique).slice(0,5);
 }
 function startLicaoDiag(){
   var perguntas = generateLicaoDiag(CUR.classe, CUR.temaIdx, CUR.licaoIdx);
@@ -5430,8 +5481,8 @@ function updateRiviorDashboardProgress(){
 /* C.E.P RIVIOR — integração real Supabase. Configurar URL e publishable/anon key antes de usar. */
 (function(){
 'use strict';
-const SUPABASE_URL = 'COLOQUE_AQUI_A_URL_DO_PROJECTO';
-const SUPABASE_ANON_KEY = 'COLOQUE_AQUI_A_CHAVE_PUBLICAVEL';
+const SUPABASE_URL = 'https://nbymepgoztensexxubvj.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_xaSDr3kW1PTDXDQ6z71pLw_KFXZCSDJ';
 const READY = /^https:\/\/[a-z0-9-]+\.supabase\.co$/.test(SUPABASE_URL) && (SUPABASE_ANON_KEY.startsWith('eyJ') || SUPABASE_ANON_KEY.startsWith('sb_publishable_')) && !SUPABASE_ANON_KEY.includes('COLOQUE_AQUI');
 let sb=null, cloudUser=null, cloudProfile=null, activeConversation=null, realtimeChannel=null, selectedUpload=null;
 const $ = id => document.getElementById(id);
@@ -5466,7 +5517,7 @@ async function enterCloud(user){if(!sb||!user)return;const {data,error}=await sb
   addCloudEntryPoints();const isT=data.role==='teacher';if($('ch-tab-students'))$('ch-tab-students').style.display=isT?'':'none';if($('ch-close'))$('ch-close').style.display=isT?'none':'';$('ch-status').textContent='Ligado ao Supabase · '+(isT?'professor':'aluno')+' · '+user.email;if(!isT){syncCloudAvg();syncLearningProgress();}
 }
 // Replaces the old local-only login. No hard-coded teacher password or local-only login is accepted.
-window.doLogin=async function(){if(!configured()){notify('Supabase não configurado. Abre a configuração e coloca a URL e a chave publicável antes de entrar.');return;}const creating=document.getElementById('tabCriar')?.classList.contains('active');const email=String((creating?($('in-email-signup')?.value||''):($('in-username')?.value||''))).trim().toLowerCase();const password=(creating?$('in-password-signup')?.value:$('in-password')?.value)||'';if(!email||!email.includes('@')){notify('Introduz um email válido.');return;}if(password.length<6){notify('A senha deve ter pelo menos 6 caracteres.');return;}const btn=document.querySelector('#view-login .btn.gold');if(btn)btn.disabled=true;try{let result;if(creating){const nome=$('in-nome').value.trim(),numero=$('in-numero').value.trim(),classe=$('in-classe').value,turma=$('in-turma').value.trim(),periodo=$('in-periodo').value,sexo=$('in-sexo').value,nascimento=$('in-nascimento').value,username=$('in-username-signup').value.trim();if(!nome||!numero||!classe||!turma||!periodo||!sexo||!nascimento||!username){notify('Preenche todos os campos do aluno.');return;}result=await sb.auth.signUp({email,password,options:{data:{full_name:nome,student_number:numero,class_level:Number(classe),class_group:turma,period:periodo,sex:sexo,birth_date:nascimento,username}}});}else result=await sb.auth.signInWithPassword({email,password});if(result.error)throw result.error;if(creating&&!result.data.session){notify('Conta criada. Confirma o email recebido e depois entra.');return;}if(result.data.user)await enterCloud(result.data.user);}catch(e){notify('Supabase: '+(e.message||'não foi possível concluir a operação.'));}finally{if(btn)btn.disabled=false;}};
+window.doLogin=async function(){if(!configured()){notify('Supabase não configurado. Abre a configuração e coloca a URL e a chave publicável antes de entrar.');return;}const creating=document.getElementById('tabCriar')?.classList.contains('active');const email=String((creating?($('in-email-signup')?.value||''):($('in-username')?.value||''))).trim().toLowerCase();const password=(creating?$('in-password-signup')?.value:$('in-password')?.value)||'';if(!email||!email.includes('@')){notify('Introduz um email válido.');return;}if(password.length<6){notify('A senha deve ter pelo menos 6 caracteres.');return;}const btn=document.querySelector('#view-login .btn.gold');if(btn)btn.disabled=true;try{let result;if(creating){const nome=$('in-nome').value.trim(),numero=$('in-numero').value.trim(),classe=$('in-classe').value,turma=$('in-turma').value.trim(),periodo=$('in-periodo').value,sexo=$('in-sexo').value,nascimento=$('in-nascimento').value,username=$('in-username-signup').value.trim();if(!nome||!numero||!classe||!turma||!periodo||!sexo||!nascimento||!username){notify('Preenche todos os campos do aluno.');return;}result=await sb.auth.signUp({email,password,options:{emailRedirectTo:(window.location.origin+window.location.pathname),data:{full_name:nome,student_number:numero,class_level:Number(classe),class_group:turma,period:periodo,sex:sexo,birth_date:nascimento,username}}});}else result=await sb.auth.signInWithPassword({email,password});if(result.error)throw result.error;if(creating&&!result.data.session){notify('Conta criada. Abre o email de confirmação e toca em Confirmar. O link deverá regressar a esta página. Se aparecer erro de redirecionamento, no Supabase vai a Authentication → URL Configuration e adiciona este endereço aos Redirect URLs: '+(window.location.origin+window.location.pathname));return;}if(result.data.user)await enterCloud(result.data.user);}catch(e){notify('Supabase: '+(e.message||'não foi possível concluir a operação.'));}finally{if(btn)btn.disabled=false;}};
 window.createAccount=async()=>window.doLogin();
 const oldLogout=window.logout;window.logout=async function(){if(sb){await sb.auth.signOut();}try{window.riviorCloudClose();}catch(_){}window.__cloudAvg=null;cloudUser=null;cloudProfile=null;activeConversation=null;if(realtimeChannel&&sb){sb.removeChannel(realtimeChannel);realtimeChannel=null;}window.RIVIOR_CLOUD=null;if(oldLogout)oldLogout();};
 async function renderGrades(c){if(cloudProfile.role==='teacher'){const {data:students,error}=await sb.from('profiles').select('id,full_name,class_level,class_group,student_number').eq('role','student').order('class_level').order('full_name');if(error){c.innerHTML='<div class="ch-card">Erro ao carregar alunos: '+safe(error.message)+'</div>';return;}c.innerHTML=`<div class="ch-grid"><div class="ch-card"><h3>Lançar nota</h3><label>Aluno</label><select id="cg-student">${(students||[]).map(s=>`<option value="${s.id}" ${s.id===window.__cgPre?'selected':''}>${safe(s.full_name)} · ${s.class_level}.ª ${safe(s.class_group)}</option>`).join('')}</select><label>Disciplina</label><input id="cg-subject" value="Física"><label>Trimestre</label><select id="cg-term"><option value="1">1.º</option><option value="2">2.º</option><option value="3">3.º</option></select><label>Avaliação</label><input id="cg-label" placeholder="Ex.: Teste 1"><label>Nota (0–20)</label><input id="cg-score" type="number" min="0" max="20" step="0.1"><button class="ch-primary" onclick="riviorSaveGrade()">Guardar nota no Supabase</button><p class="ch-muted">Cada alteração fica registada no histórico.</p></div><div class="ch-card"><h3>Notas e alertas</h3><div id="cg-results">A carregar…</div></div></div>`;await loadTeacherGrades();}else{const {data,error}=await sb.from('grades').select('id,subject,term,assessment_label,score,created_at,profiles!grades_student_id_fkey(full_name)').eq('student_id',cloudUser.id).order('created_at',{ascending:false});if(error){c.innerHTML='<div class="ch-card">Erro: '+safe(error.message)+'</div>';return;}c.innerHTML='<div class="ch-card"><h3>As minhas notas</h3>'+gradeTable(data||[])+'</div>';}}
