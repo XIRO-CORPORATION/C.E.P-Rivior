@@ -6425,5 +6425,79 @@ const boot=()=>{init();setTimeout(riviorSignupRoleChanged,100);};if(document.rea
 })();
 </script>
 
+<!-- Assistente IA Rivior: interface integrada com a Edge Function rivior-assistant -->
+<style>
+#rivior-ai-launch{position:fixed;right:16px;bottom:calc(18px + env(safe-area-inset-bottom));z-index:9998;border:0;border-radius:999px;padding:13px 17px;background:linear-gradient(135deg,#7c5cff,#2563eb);color:white;font-weight:800;font-size:14px;box-shadow:0 8px 28px #0008;cursor:pointer}
+#rivior-ai-panel{position:fixed;inset:0;z-index:10002;background:rgba(2,6,16,.78);backdrop-filter:blur(7px);display:none;padding:12px;box-sizing:border-box;color:#edf3ff;font-family:inherit}
+#rivior-ai-panel.open{display:flex;align-items:center;justify-content:center}
+#rivior-ai-panel .rai-window{width:min(760px,100%);height:min(850px,96dvh);display:flex;flex-direction:column;background:#091329;border:1px solid #344566;border-radius:18px;overflow:hidden;box-shadow:0 18px 70px #0009}
+#rivior-ai-panel .rai-head{padding:14px 16px;background:#101e3a;border-bottom:1px solid #2b3c5c;display:flex;align-items:center;justify-content:space-between;gap:10px}
+#rivior-ai-panel .rai-head h2{margin:0;font-size:18px}#rivior-ai-panel .rai-sub{font-size:12px;opacity:.75;margin-top:4px}
+#rivior-ai-panel button,#rivior-ai-panel select,#rivior-ai-panel textarea{font:inherit}
+#rivior-ai-panel .rai-close{background:#1d2d4c;color:white;border:1px solid #425678;border-radius:10px;padding:8px 12px}
+#rivior-ai-panel .rai-settings{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:12px 14px;border-bottom:1px solid #243553}
+#rivior-ai-panel label{font-size:12px;opacity:.85}#rivior-ai-panel select{display:block;width:100%;margin-top:5px;padding:10px;border:1px solid #344666;border-radius:10px;background:#071124;color:#fff}
+#rivior-ai-panel .rai-messages{flex:1;overflow:auto;padding:14px;display:flex;flex-direction:column;gap:10px}
+#rivior-ai-panel .rai-msg{max-width:92%;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.5;padding:11px 13px;border-radius:13px;font-size:14px}
+#rivior-ai-panel .rai-user{align-self:flex-end;background:#263e70}#rivior-ai-panel .rai-bot{align-self:flex-start;background:#13213a;border:1px solid #2d405f}#rivior-ai-panel .rai-note{font-size:12px;opacity:.7;text-align:center;padding:0 14px 8px}
+#rivior-ai-panel .rai-form{padding:12px;display:flex;gap:8px;border-top:1px solid #243553;background:#0b1730}
+#rivior-ai-panel textarea{flex:1;min-width:0;resize:vertical;min-height:46px;max-height:150px;padding:11px;border:1px solid #344666;border-radius:12px;background:#071124;color:#fff}
+#rivior-ai-panel .rai-send{border:0;border-radius:12px;padding:0 16px;background:#4267e8;color:#fff;font-weight:800}#rivior-ai-panel .rai-send:disabled{opacity:.55}
+#rivior-ai-panel .rai-actions{display:flex;gap:8px;padding:0 12px 10px}#rivior-ai-panel .rai-actions button{background:#142440;color:#dbe7ff;border:1px solid #344666;border-radius:9px;padding:7px 10px;font-size:12px}
+@media(max-width:520px){#rivior-ai-panel{padding:0}#rivior-ai-panel .rai-window{height:100dvh;border-radius:0;width:100%}#rivior-ai-panel .rai-settings{gap:7px;padding:9px}#rivior-ai-panel .rai-msg{max-width:96%}#rivior-ai-launch{right:12px;bottom:calc(12px + env(safe-area-inset-bottom))}}
+</style>
+<button id="rivior-ai-launch" type="button" aria-label="Abrir Assistente IA do Rivior">🤖 Assistente IA</button>
+<div id="rivior-ai-panel" role="dialog" aria-modal="true" aria-label="Assistente IA do Rivior">
+ <section class="rai-window">
+  <header class="rai-head"><div><h2>🤖 Assistente IA Rivior</h2><div class="rai-sub">Aprender, preparar aulas e treinar para provas</div></div><button class="rai-close" id="rivior-ai-close" type="button">Fechar ✕</button></header>
+  <div class="rai-settings">
+   <label>Modo<select id="rivior-ai-mode"><option value="aluno">Aluno — aprender e preparar provas</option><option value="professor">Professor — aulas e avaliações</option></select></label>
+   <label>Disciplina<select id="rivior-ai-subject"><option>Geral</option><option>Matemática</option><option>Física</option><option>Química</option><option>Biologia</option><option>Português</option><option>Inglês</option><option>História</option><option>Geografia</option><option>Informática</option><option>Educação Física</option><option>Outra</option></select></label>
+   <label style="grid-column:1/-1">Classe / nível<input id="rivior-ai-class" type="text" maxlength="30" placeholder="Ex.: 8.ª classe" style="display:block;box-sizing:border-box;width:100%;margin-top:5px;padding:10px;border:1px solid #344666;border-radius:10px;background:#071124;color:#fff"></label>
+  </div>
+  <div class="rai-actions"><button type="button" id="rivior-ai-clear">Nova conversa</button><button type="button" id="rivior-ai-lesson">Preparar uma aula</button><button type="button" id="rivior-ai-test">Criar teste de treino</button></div>
+  <div class="rai-messages" id="rivior-ai-messages" aria-live="polite"><div class="rai-msg rai-bot">Olá! Sou o assistente educativo do Rivior. Posso explicar uma matéria passo a passo, resolver exercícios, ajudar-te a preparar uma prova ou criar planos de aula e avaliações. Escolhe o modo, a disciplina e a classe e escreve o que precisas.</div></div>
+  <div class="rai-note">As respostas são geradas por IA. Confirma conteúdos e critérios antes de usar numa avaliação oficial.</div>
+  <form class="rai-form" id="rivior-ai-form"><textarea id="rivior-ai-input" maxlength="8000" placeholder="Escreve a tua pergunta ou descreve o material..." aria-label="A tua pergunta" required></textarea><button class="rai-send" id="rivior-ai-send" type="submit">Enviar</button></form>
+ </section>
+</div>
+<script>
+(function(){
+ 'use strict';
+ const URL_BASE='https://nbymepgoztensexxubvj.supabase.co';
+ const PUBLIC_KEY='sb_publishable_xaSDr3kW1PTDXDQ6z71pLw_KFXZCSDJ';
+ const $=id=>document.getElementById(id);
+ const panel=$('rivior-ai-panel'), messages=$('rivior-ai-messages'), form=$('rivior-ai-form'), input=$('rivior-ai-input'), send=$('rivior-ai-send');
+ let history=[], accessToken=null, profile=null;
+ function addMessage(text,who){const div=document.createElement('div');div.className='rai-msg '+(who==='user'?'rai-user':'rai-bot');div.textContent=text;messages.appendChild(div);messages.scrollTop=messages.scrollHeight;return div;}
+ function open(){panel.classList.add('open');document.body.style.overflow='hidden';refreshSession();setTimeout(()=>input.focus(),100);}
+ function close(){panel.classList.remove('open');document.body.style.overflow='';}
+ async function refreshSession(){
+  try{if(!window.supabase||!window.supabase.createClient)return;const client=window.supabase.createClient(URL_BASE,PUBLIC_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});const {data}=await client.auth.getSession();accessToken=data.session?.access_token||null;
+   if(data.session?.user){const {data:p}=await client.from('profiles').select('role,class_level,class_group,period').eq('id',data.session.user.id).maybeSingle();profile=p||null;
+    if(profile){const role=String(profile.role||'').toLowerCase();$('rivior-ai-mode').value=(role==='teacher'||role==='professor'||role==='professor(a)'||role==='manager')?'professor':'aluno';if(profile.class_level&&!$('rivior-ai-class').value)$('rivior-ai-class').value=profile.class_level+'ª classe';}
+   }
+  }catch(e){console.warn('Rivior IA: não foi possível ler a sessão',e);}
+ }
+ $('rivior-ai-launch').addEventListener('click',open);$('rivior-ai-close').addEventListener('click',close);panel.addEventListener('click',e=>{if(e.target===panel)close();});document.addEventListener('keydown',e=>{if(e.key==='Escape')close();});
+ $('rivior-ai-clear').addEventListener('click',()=>{history=[];messages.innerHTML='';addMessage('Nova conversa iniciada. Em que posso ajudar?','bot');});
+ $('rivior-ai-lesson').addEventListener('click',()=>{input.value='Prepara um plano de aula completo sobre [indica o tema], com objectivos, pré-requisitos, introdução, desenvolvimento, exemplos, actividades para os alunos, recursos e avaliação final.';input.focus();});
+ $('rivior-ai-test').addEventListener('click',()=>{input.value='Cria uma prova de treino sobre [indica o tema], adequada à classe seleccionada, com perguntas variadas, cotação total de 20 valores, gabarito e explicação das respostas.';input.focus();});
+ form.addEventListener('submit',async e=>{
+  e.preventDefault();const message=input.value.trim();if(!message)return;
+  await refreshSession();if(!accessToken){addMessage('Para utilizar o Assistente IA, inicia sessão na tua conta do Rivior e tenta novamente.','bot');return;}
+  const mode=$('rivior-ai-mode').value,subject=$('rivior-ai-subject').value,classLevel=$('rivior-ai-class').value.trim();
+  addMessage(message,'user');history.push({role:'user',parts:[{text:message}]});input.value='';send.disabled=true;send.textContent='A pensar…';const waiting=addMessage('Estou a preparar a resposta…','bot');
+  try{
+   const response=await fetch(URL_BASE+'/functions/v1/rivior-assistant',{method:'POST',headers:{'Content-Type':'application/json','apikey':PUBLIC_KEY,'Authorization':'Bearer '+accessToken},body:JSON.stringify({message,mode,subject,classLevel,history:history.slice(0,-1)})});
+   let data={};try{data=await response.json();}catch(_){}
+   if(!response.ok)throw new Error(data.error||('O serviço respondeu com erro '+response.status+'.'));
+   const answer=String(data.answer||'Não recebi uma resposta. Tenta novamente.');waiting.textContent=answer;history.push({role:'model',parts:[{text:answer}]});if(history.length>12)history=history.slice(-12);
+  }catch(err){waiting.textContent='Não consegui obter uma resposta: '+(err.message||'erro de ligação')+'\n\nConfirma que GEMINI_API_KEY está guardada nos Secrets do Supabase e que a tua sessão continua activa.';}
+  finally{send.disabled=false;send.textContent='Enviar';messages.scrollTop=messages.scrollHeight;input.focus();}
+ });
+})();
+</script>
+
 </body>
 </html>
