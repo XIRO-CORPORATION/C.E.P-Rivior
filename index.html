@@ -5,10 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="Rivior"><meta name="theme-color" content="#02050a"><meta name="format-detection" content="telephone=no">
 <style>html{-webkit-text-size-adjust:100%;text-size-adjust:100%}body{-webkit-tap-highlight-color:transparent;overscroll-behavior-y:none}
-/* Acesso docente explícito e visível no ecrã inicial (correcção Etapa 14) */
-.teacher-entry-panel{margin:16px 0 12px;padding:16px;border:1px solid rgba(240,182,39,.52);border-radius:17px;background:linear-gradient(135deg,rgba(20,43,79,.98),rgba(17,24,38,.98) 58%,rgba(67,47,15,.5));box-shadow:0 12px 30px rgba(0,0,0,.26),inset 0 1px 0 rgba(255,255,255,.07);position:relative;z-index:2}.teacher-entry-panel:before{content:"ACESSO DOCENTE";display:block;font-size:9px;letter-spacing:1.8px;font-weight:950;color:#ffd166;margin-bottom:9px}.teacher-entry-heading{display:flex;align-items:center;gap:10px;margin-bottom:12px}.teacher-entry-icon{width:42px;height:42px;display:grid;place-items:center;border-radius:12px;background:rgba(47,111,237,.22);font-size:22px;flex:0 0 auto}.teacher-entry-heading strong,.teacher-entry-heading small{display:block}.teacher-entry-heading strong{font-size:15px;color:var(--ink)}.teacher-entry-heading small{font-size:11px;line-height:1.45;color:var(--ink-dim);margin-top:3px}.teacher-entry-actions{display:grid;grid-template-columns:1fr 1fr;gap:9px}.teacher-entry-actions button{min-height:48px;padding:11px 9px;border-radius:12px;font:800 12px/1.35 inherit;cursor:pointer;touch-action:manipulation}.teacher-entry-login{border:1px solid rgba(95,145,255,.65);background:linear-gradient(180deg,rgba(47,111,237,.27),rgba(47,111,237,.13));color:#d8e5ff}.teacher-entry-signup{border:1px solid rgba(240,182,39,.72);background:linear-gradient(180deg,rgba(240,182,39,.28),rgba(240,182,39,.12));color:#ffe19a}.teacher-entry-help{margin:10px 0 0;color:#b6c4df;font-size:10.5px;line-height:1.5}
-.teacher-entry-heading{display:flex;align-items:center;gap:10px;margin-bottom:10px}.teacher-entry-icon{width:38px;height:38px;display:grid;place-items:center;border-radius:11px;background:rgba(47,111,237,.16);font-size:20px}.teacher-entry-heading strong,.teacher-entry-heading small{display:block}.teacher-entry-heading strong{font-size:14px;color:var(--ink)}.teacher-entry-heading small{font-size:11px;line-height:1.4;color:var(--ink-dim);margin-top:2px}.teacher-entry-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}.teacher-entry-actions button{min-height:43px;padding:10px 8px;border-radius:11px;font:800 12px/1.3 inherit;cursor:pointer}.teacher-entry-login{border:1px solid rgba(95,145,255,.55);background:rgba(47,111,237,.17);color:#cfe0ff}.teacher-entry-signup{border:1px solid rgba(240,182,39,.55);background:rgba(240,182,39,.13);color:#ffdc83}.teacher-entry-help{margin:9px 0 0;color:var(--ink-dim);font-size:10.5px;line-height:1.45}
-@media(max-width:390px){.teacher-entry-actions{grid-template-columns:1fr}.teacher-entry-actions button{min-height:42px}}
 </style>
 <title>C.E.P Rivior — Plataforma de Estudo</title>
 <style>
@@ -613,14 +609,7 @@ img,canvas,video,iframe{max-width:100%}
       <div class="login-logo-wrap"><img id="loginLogo" alt="C.E.P Rivior"></div>
       <div class="login-h1">Colégio C.E.P Rivior</div>
       <div class="login-h2">Luanda · Nova Vida — Laboratório Digital de Física</div>
-        <section class="teacher-entry-panel" aria-label="Acesso do professor">
-          <div class="teacher-entry-heading"><span class="teacher-entry-icon">👨‍🏫</span><div><strong>Área do Professor</strong><small>Entrar na conta docente ou criar uma conta nova.</small></div></div>
-          <div class="teacher-entry-actions">
-            <button type="button" class="teacher-entry-login" onclick="riviorTeacherLogin()">Já sou professor · Entrar</button>
-            <button type="button" class="teacher-entry-signup" onclick="riviorTeacherSignup()">Criar conta de professor</button>
-          </div>
-          <p id="teacher-entry-help" class="teacher-entry-help">O acesso usa o email e a senha da conta docente. Contas novas ficam sujeitas à validação e atribuição do administrador.</p>
-        </section>
+
       <div class="gcard">
         <div class="seg">
           <button class="active" id="tabEntrar" onclick="switchTab('entrar')">Entrar</button>
@@ -638,7 +627,7 @@ img,canvas,video,iframe{max-width:100%}
 
         <div id="signup-fields" class="hidden">
           <div class="form-grid">
-            <div class="full"><label>Tipo de conta</label><select id="in-account-type" onchange="riviorSignupRoleChanged()"><option value="student">Aluno</option><option value="teacher">Professor</option></select><small id="signup-role-help" style="display:block;color:var(--ink-dim);margin:0 0 8px">Os alunos registam-se com os dados escolares. Os professores fazem o seu próprio cadastro e aguardam atribuição do administrador.</small></div>
+            <div class="full"><label>Tipo de conta</label><select id="in-account-type" onchange="riviorSignupRoleChanged()"><option value="student">Aluno</option><option value="teacher">Professor</option><option value="guardian">Encarregado</option></select><small id="signup-role-help" style="display:block;color:var(--ink-dim);margin:0 0 8px">Os alunos registam-se com os dados escolares. Os professores fazem o seu próprio cadastro e aguardam atribuição do administrador.</small></div>
             <div class="full"><label>Nome completo</label><input type="text" id="in-nome" autocomplete="name" placeholder="Ex.: Manuel Tchissingui"></div>
             <div class="full"><label>Email</label><input type="email" id="in-email-signup" autocomplete="email" placeholder="aluno@exemplo.com" required></div>
             <div><label>Número de aluno</label><input type="text" id="in-numero" placeholder="Ex.: 2026-0142"></div>
@@ -1129,9 +1118,10 @@ async function bootAfterSplash(){
   } else if(store.perfil && store.perfil.nome && store.perfil.classe){
     openDash();
   } else {
+    // Não bloquear o acesso cloud por causa de um perfil legado guardado localmente.
+    // As credenciais válidas são verificadas exclusivamente pelo Supabase em doLogin().
     showBG('building');
     show('view-login');
-    if(store.perfil && store.perfil.nome && !store.perfil.username){ loginError('A conta antiga não tem credenciais de acesso. Crie uma nova conta para continuar.'); }
   }
 }
 
@@ -5557,7 +5547,33 @@ async function enterCloud(user){if(!sb||!user)return;const {data,error}=await sb
   addCloudEntryPoints();const isT=data.role==='teacher',isM=data.role==='manager';if(isT){['view-login','view-dash','view-teacher','view-tema','view-licao','view-quiz','view-exp'].forEach(id=>{if($(id))$(id).classList.add('hidden');});}if($('ch-tab-students'))$('ch-tab-students').style.display=(isT||isM)?'':'none';if($('ch-tab-directory'))$('ch-tab-directory').style.display=(isT||isM)?'':'none';if($('ch-tab-behavior'))$('ch-tab-behavior').style.display=(isT||isM)?'':'none';if($('ch-tab-attendance'))$('ch-tab-attendance').style.display=(isT||isM)?'':'none';if($('ch-tab-management'))$('ch-tab-management').style.display=isM?'':'none';if($('ch-close'))$('ch-close').style.display=isT?'none':'';$('ch-status').textContent='Ligado ao Supabase · '+(isM?'gestor':isT?'professor':'aluno')+' · '+user.email;if(isM){riviorCloudOpen('management');}else if(isT){riviorCloudOpen('grades');}else{syncCloudAvg();syncLearningProgress();refreshNoticeBadge();}
 }
 // Replaces the old local-only login. No hard-coded teacher password or local-only login is accepted.
-window.doLogin=async function(){if(!configured()){notify('Supabase não configurado. Abre a configuração e coloca a URL e a chave publicável antes de entrar.');return;}const creating=document.getElementById('tabCriar')?.classList.contains('active');const email=String((creating?($('in-email-signup')?.value||''):($('in-username')?.value||''))).trim().toLowerCase();const password=(creating?$('in-password-signup')?.value:$('in-password')?.value)||'';if(!email||!email.includes('@')){notify('Introduz um email válido.');return;}if(password.length<6){notify('A senha deve ter pelo menos 6 caracteres.');return;}const btn=document.querySelector('#view-login .btn.gold');if(btn)btn.disabled=true;try{let result;if(creating){const nome=$('in-nome').value.trim(),numero=$('in-numero').value.trim(),classe=$('in-classe').value,turma=$('in-turma').value.trim(),periodo=$('in-periodo').value,sexo=$('in-sexo').value,nascimento=$('in-nascimento').value,username=$('in-username-signup').value.trim();if(!nome||!numero||!classe||!turma||!periodo||!sexo||!nascimento||!username){notify('Preenche todos os campos do aluno.');return;}result=await sb.auth.signUp({email,password,options:{emailRedirectTo:(window.location.origin+window.location.pathname),data:{full_name:nome,student_number:numero,class_level:Number(classe),class_group:turma,period:periodo,sex:sexo,birth_date:nascimento,username}}});}else result=await sb.auth.signInWithPassword({email,password});if(result.error)throw result.error;if(creating&&!result.data.session){notify('Conta criada. Abre o email de confirmação e toca em Confirmar. O link deverá regressar a esta página. Se aparecer erro de redirecionamento, no Supabase vai a Authentication → URL Configuration e adiciona este endereço aos Redirect URLs: '+(window.location.origin+window.location.pathname));return;}if(result.data.user)await enterCloud(result.data.user);}catch(e){notify('Supabase: '+(e.message||'não foi possível concluir a operação.'));}finally{if(btn)btn.disabled=false;}};
+window.doLogin=async function(){
+ if(!configured()){notify('Supabase não configurado. Abre a configuração e coloca a URL e a chave publicável antes de entrar.');return;}
+ const creating=document.getElementById('tabCriar')?.classList.contains('active');
+ const role=creating?String($('in-account-type')?.value||'student'):'student';
+ if(creating&&role==='guardian'){if(window.openGuardianPortal)window.openGuardianPortal();else notify('Portal do encarregado indisponível. Actualiza a página.');return;}
+ const email=String((creating?($('in-email-signup')?.value||''):($('in-username')?.value||''))).trim().toLowerCase();
+ const password=(creating?$('in-password-signup')?.value:$('in-password')?.value)||'';
+ if(!email||!email.includes('@')){notify('Introduz um email válido.');return;}
+ if(password.length<6){notify('A senha deve ter pelo menos 6 caracteres.');return;}
+ const btn=document.querySelector('#view-login .btn.gold');if(btn)btn.disabled=true;
+ try{
+  let result;
+  if(creating){
+   const nome=String($('in-nome')?.value||'').trim();if(!nome){notify('Preenche o nome completo.');return;}
+   let metadata={full_name:nome,role};
+   if(role==='student'){
+    const numero=$('in-numero').value.trim(),classe=$('in-classe').value,turma=$('in-turma').value.trim(),periodo=$('in-periodo').value,sexo=$('in-sexo').value,nascimento=$('in-nascimento').value,username=$('in-username-signup').value.trim();
+    if(!numero||!classe||!turma||!periodo||!sexo||!nascimento||!username){notify('Preenche todos os campos do aluno.');return;}
+    metadata={...metadata,student_number:numero,class_level:Number(classe),class_group:turma,period:periodo,sex:sexo,birth_date:nascimento,username};
+   }
+   result=await sb.auth.signUp({email,password,options:{emailRedirectTo:(window.location.origin+window.location.pathname),data:metadata}});
+  }else result=await sb.auth.signInWithPassword({email,password});
+  if(result.error)throw result.error;
+  if(creating&&!result.data.session){notify('Conta criada. Confirma o email enviado antes de entrar. Se não receberes a mensagem, verifica Spam e a configuração SMTP/Email do Supabase.');return;}
+  if(result.data.user)await enterCloud(result.data.user);
+ }catch(e){notify('Supabase: '+(e.message||'não foi possível concluir a operação.'));}finally{if(btn)btn.disabled=false;}
+};
 window.createAccount=async()=>window.doLogin();
 const oldLogout=window.logout;window.logout=async function(){if(sb){await sb.auth.signOut();}try{window.riviorCloudClose();}catch(_){}window.__cloudAvg=null;cloudUser=null;cloudProfile=null;window.__riviorActiveYearId=null;window.__riviorActiveYear=null;activeConversation=null;if(realtimeChannel&&sb){sb.removeChannel(realtimeChannel);realtimeChannel=null;}window.RIVIOR_CLOUD=null;if(oldLogout)oldLogout();};
 /* ===== ETAPA 2: atribuições académicas de professores ===== */
@@ -5843,10 +5859,18 @@ window.riviorLoadAttendanceRecent=async function(){const box=$('att-recent');if(
 /* ===== ETAPA 3 — cadastro de professores, pesquisa global, comportamento e administração ===== */
 function riviorSignupRoleChanged(){
   const role=document.getElementById('in-account-type')?.value||'student';
-  ['in-numero','in-classe','in-turma','in-periodo','in-sexo','in-nascimento','in-username-signup'].forEach(id=>{const e=$(id);if(e){const box=e.closest('.full')||e.closest('div');if(box)box.style.display=role==='teacher'?'none':'';e.required=role==='student';}});
-  const h=$('signup-role-help');if(h)h.textContent=role==='teacher'?'Cadastro normal de professor com email e senha. A conta será criada como professor e ficará limitada até o administrador atribuir classes, turmas e disciplinas.':'Os alunos registam-se com os seus dados escolares.';
-  const n=$('in-nome');if(n)n.placeholder=role==='teacher'?'Ex.: Nome completo do professor':'Ex.: Nome completo do aluno';
+  const studentOnly=['in-numero','in-classe','in-turma','in-periodo','in-sexo','in-nascimento','in-username-signup'];
+  studentOnly.forEach(id=>{const e=$(id);if(e){const box=e.closest('.full')||e.closest('div');if(box)box.style.display=role==='student'?'':'none';e.required=role==='student';}});
+  const h=$('signup-role-help');
+  if(h)h.textContent=role==='teacher'?'Cadastro de professor. A conta ficará sujeita às atribuições de classes, turmas e disciplinas pelo ADM.':role==='guardian'?'Para encarregado, abre o portal próprio para criar a conta e associá-la ao educando.':'Preenche os dados escolares do aluno para criar a conta.';
+  const n=$('in-nome');if(n)n.placeholder=role==='teacher'?'Ex.: Nome completo do professor':role==='guardian'?'Ex.: Nome completo do encarregado':'Ex.: Nome completo do aluno';
+  let g=document.getElementById('signup-guardian-link');
+  if(role==='guardian'){
+    if(!g){g=document.createElement('div');g.id='signup-guardian-link';g.className='full';g.innerHTML='<button type="button" class="btn ghost block" onclick="window.openGuardianPortal && window.openGuardianPortal()">Continuar no portal do encarregado →</button>'; const f=document.getElementById('signup-fields');if(f)f.appendChild(g);}
+    g.style.display='';
+  }else if(g)g.style.display='none';
 }
+
 window.riviorSignupRoleChanged=riviorSignupRoleChanged;
 window.doLogin=async function(){
   if(!window.supabase||!window.supabase.createClient)return notify('A biblioteca de ligação não carregou. Actualiza a página e tenta novamente.');
@@ -6317,27 +6341,7 @@ const boot=()=>{init();setTimeout(riviorSignupRoleChanged,100);};if(document.rea
 /* ================= FIM RIVIOR ETAPA 12 ================= */
 </script>
 
-<script>
 
-/* ===== ETAPA 14 — ENTRADA DOCENTE VISÍVEL ===== */
-window.riviorTeacherLogin=function(){
-  if(typeof switchTab==='function')switchTab('entrar');
-  const help=document.getElementById('teacher-entry-help');
-  if(help)help.textContent='Introduz o email e a senha que o administrador registou/validou para ti. Ao entrar, a Rivior identifica automaticamente a conta docente e abre a área académica do professor.';
-  const email=document.getElementById('in-username');
-  if(email){email.focus({preventScroll:true});email.scrollIntoView({behavior:'smooth',block:'center'});}
-};
-window.riviorTeacherSignup=function(){
-  if(typeof switchTab==='function')switchTab('criar');
-  const role=document.getElementById('in-account-type');
-  if(role){role.value='teacher';if(typeof riviorSignupRoleChanged==='function')riviorSignupRoleChanged();}
-  const help=document.getElementById('teacher-entry-help');
-  if(help)help.textContent='Cadastro docente seleccionado. Preenche nome, email e senha; confirma a senha. A conta poderá exigir confirmação de email e atribuição de turmas/disciplinas pelo administrador.';
-  const name=document.getElementById('in-nome');
-  if(name){name.focus({preventScroll:true});name.scrollIntoView({behavior:'smooth',block:'center'});}
-};
-
-</script>
 <script id="rivior-final-role-audit-fix">
 /* Rivior: autenticação cloud consistente para o portal do encarregado. */
 (function(){
