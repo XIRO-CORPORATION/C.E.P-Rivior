@@ -1,6 +1,11 @@
 <!DOCTYPE html>
 <html lang="pt">
 <head>
+<script>
+/* ÚNICO sítio para trocar a ligação ao Supabase (URL + chave publishable/anon). */
+window.RIVIOR_CFG={url:"https://nbymepgoztensexxubvj.supabase.co",key:"sb_publishable_xaSDr3kW1PTDXDQ6z71pLw_KFXZCSDJ"};
+</script>
+
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="Rivior"><meta name="theme-color" content="#02050a"><meta name="format-detection" content="telephone=no">
@@ -5521,8 +5526,8 @@ function updateRiviorDashboardProgress(){
 /* C.E.P RIVIOR — integração real Supabase. Configurar URL e publishable/anon key antes de usar. */
 (function(){
 'use strict';
-const SUPABASE_URL = 'https://nbymepgoztensexxubvj.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_xaSDr3kW1PTDXDQ6z71pLw_KFXZCSDJ';
+const SUPABASE_URL = window.RIVIOR_CFG.url;
+const SUPABASE_ANON_KEY = window.RIVIOR_CFG.key;
 const READY = /^https:\/\/[a-z0-9-]+\.supabase\.co$/.test(SUPABASE_URL) && (SUPABASE_ANON_KEY.startsWith('eyJ') || SUPABASE_ANON_KEY.startsWith('sb_publishable_')) && !SUPABASE_ANON_KEY.includes('COLOQUE_AQUI');
 let sb=null, cloudUser=null, cloudProfile=null, activeConversation=null, realtimeChannel=null, selectedUpload=null;
 const $ = id => document.getElementById(id);
@@ -5793,85 +5798,115 @@ async function renderProgress(c){if(cloudProfile.role==='teacher')return renderT
 async function renderChat(c){
   const me=cloudProfile;
   const match=(a,st)=>teacherHasAssignment([a],st,null);
-  let peers=[],emptyMsg='Sem contactos disponíveis.';
-  if(me.role==='teacher'){
-    const ass=await getMyAssignments();
-    if(ass===null){c.innerHTML='<div class="ch-card">Não foi possível carregar as atribuições do professor.</div>';return;}
-    const levels=[...new Set(ass.map(a=>Number(a.class_level)).filter(Boolean))];
-    let students=[];
-    if(levels.length){const q=await sb.from('profiles').select('id,full_name,role,class_level,class_group,period').eq('role','student').in('class_level',levels).order('class_level').order('full_name').limit(2000);if(q.error){c.innerHTML='<div class="ch-card">Erro ao carregar alunos: '+safe(q.error.message)+'</div>';return;}students=q.data||[];}
-    peers=students.map(st=>{const subs=[...new Set(ass.filter(a=>match(a,st)).map(a=>String(a.subject||'').trim()).filter(Boolean))];return subs.length?{id:st.id,full_name:st.full_name,role:'student',class_level:st.class_level,class_group:st.class_group,subjects:subs}:null;}).filter(Boolean);
-    emptyMsg='Ainda não tens alunos registados nas tuas turmas.';
-  }else if(me.role==='student'){
-    const q=await sb.from('teacher_assignments').select('teacher_id,class_level,class_group,subject,period,profiles!teacher_assignments_teacher_id_fkey(full_name)').eq('class_level',Number(me.class_level));
-    if(q.error){c.innerHTML='<div class="ch-card">Não foi possível carregar os teus professores: '+safe(q.error.message)+'</div>';return;}
-    const by=new Map();
-    (q.data||[]).filter(a=>match(a,me)).forEach(a=>{const t=by.get(a.teacher_id)||{id:a.teacher_id,full_name:a.profiles?.full_name||'Professor',role:'teacher',subjects:[]};const sub=String(a.subject||'').trim();if(sub&&!t.subjects.includes(sub))t.subjects.push(sub);by.set(a.teacher_id,t);});
-    peers=[...by.values()].sort((a,b)=>String(a.full_name).localeCompare(String(b.full_name)));
-    emptyMsg='Ainda não há professores registados para a tua classe.';
-  }else{
-    const q=await sb.from('profiles').select('id,full_name,role').neq('id',cloudUser.id).eq('role','teacher').order('full_name');
-    if(q.error){c.innerHTML='<div class="ch-card">Erro ao carregar contactos: '+safe(q.error.message)+'</div>';return;}
-    peers=(q.data||[]).map(p=>({id:p.id,full_name:p.full_name,role:'teacher',subjects:[]}));
-  }
-  window.__chatPeers={peers,emptyMsg,isTeacher:me.role==='teacher'};
-  const levels=[...new Set(peers.filter(p=>p.role==='student').map(p=>p.class_level))].sort((a,b)=>a-b);
-  const filters=me.role==='teacher'?`<div class="ch-row" style="gap:6px;margin:8px 0"><select id="cc-filter-class" onchange="riviorChatFilter()"><option value="">Todas as classes</option>${levels.map(l=>'<option value="'+l+'">'+l+'.ª Classe</option>').join('')}</select><input id="cc-search" placeholder="Pesquisar aluno…" oninput="riviorChatFilter()"></div>`:'';
-  const intro=me.role==='teacher'?'Escolhe um aluno das tuas turmas para abrir uma conversa.':me.role==='student'?'Escolhe um dos teus professores para enviar uma mensagem.':'Escolhe um professor para abrir uma conversa.';
-  c.innerHTML=`<div class="ch-grid"><div class="ch-card"><h3>Conversas</h3><p class="ch-muted">${intro}</p>${filters}<div id="cc-people"></div></div><div class="ch-card"><h3 id="cc-title">Mensagens</h3><div id="cc-messages" style="min-height:180px;max-height:42vh;overflow:auto"><p class="ch-muted">Abre uma conversa para carregar mensagens.</p></div><label>Mensagem</label><textarea id="cc-text" rows="3" placeholder="Escreve uma mensagem…"></textarea><label>Anexo (imagem, PDF, Word; máximo 10 MB)</label><input id="cc-file" type="file" accept="image/jpeg,image/png,image/webp,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"><button class="ch-primary" onclick="riviorSendMessage()">Enviar mensagem / ficheiro</button><div class="ch-muted" id="cc-upload-status"></div><div class="ch-card" style="margin-top:12px"><label>🧹 Limpeza automática: ficheiros acima de 4 MB apagam-se após</label><select id="cc-ttl" onchange="riviorSetTtl(this.value)">${[3,7,15,30].map(d=>'<option value="'+d+'"'+(d===chatTtlDays()?' selected':'')+'>'+d+' dias</option>').join('')}</select><p class="ch-muted">Só os ficheiros grandes são removidos; o texto da conversa fica. Podes também apagar qualquer mensagem ou ficheiro teu a qualquer momento.</p></div></div></div>`;
-  window.riviorChatFilter();
+  // Sugestões rápidas (turmas/professores atribuídos). Se falhar, a pesquisa continua a funcionar.
+  let peers=[];
+  try{
+    if(me.role==='teacher'){
+      const ass=await getMyAssignments();
+      if(ass&&ass.length){
+        const levels=[...new Set(ass.map(a=>Number(a.class_level)).filter(Boolean))];
+        if(levels.length){
+          const q=await sb.from('profiles').select('id,full_name,role,class_level,class_group,period').eq('role','student').in('class_level',levels).order('class_level').order('full_name').limit(300);
+          (q.data||[]).forEach(st=>{const subs=[...new Set(ass.filter(a=>match(a,st)).map(a=>String(a.subject||'').trim()).filter(Boolean))];if(subs.length)peers.push({id:st.id,full_name:st.full_name,role:'student',class_level:st.class_level,class_group:st.class_group,subjects:subs});});
+        }
+      }
+    }else if(me.role==='student'){
+      const q=await sb.from('teacher_assignments').select('teacher_id,class_level,class_group,subject,period,profiles!teacher_assignments_teacher_id_fkey(full_name)').eq('class_level',Number(me.class_level));
+      const by=new Map();
+      (q.data||[]).filter(a=>match(a,me)).forEach(a=>{const t=by.get(a.teacher_id)||{id:a.teacher_id,full_name:a.profiles?.full_name||'Professor',role:'teacher',subjects:[]};const sub=String(a.subject||'').trim();if(sub&&!t.subjects.includes(sub))t.subjects.push(sub);by.set(a.teacher_id,t);});
+      peers=[...by.values()].sort((a,b)=>String(a.full_name).localeCompare(String(b.full_name)));
+    }
+  }catch(e){console.warn('Sugestões de chat indisponíveis:',e);}
+  window.__chatPeers={peers};
+  const classOpts=[7,8,9,10,11,12,13].map(n=>'<option value="'+n+'">'+n+'.ª classe</option>').join('');
+  const intro=me.role==='teacher'?'Pesquisa um aluno (7.ª à 13.ª) ou um colega professor pelo nome.':'Pesquisa um professor ou um colega (7.ª à 13.ª) pelo nome.';
+  c.innerHTML=`<div class="ch-grid"><div class="ch-card"><h3>Conversas</h3><p class="ch-muted">${intro}</p><div class="ch-row" style="gap:6px;margin:8px 0"><input id="cc-search" placeholder="Escreve o nome (mín. 2 letras)…" oninput="riviorChatSearchDebounced()" autocomplete="off"><select id="cc-filter" onchange="riviorChatSearch()"><option value="">Todos</option><option value="T">Só professores</option>${classOpts}</select></div><div id="cc-people"></div><div id="cc-blocked"></div></div><div class="ch-card"><div class="ch-row" style="align-items:center;justify-content:space-between;gap:8px"><h3 id="cc-title" style="margin:0">Mensagens</h3><button id="cc-block" style="display:none" onclick="riviorBlockActive()">🚫 Bloquear</button></div><div id="cc-messages" style="min-height:180px;max-height:42vh;overflow:auto"><p class="ch-muted">Abre uma conversa para carregar mensagens.</p></div><label>Mensagem</label><textarea id="cc-text" rows="3" placeholder="Escreve uma mensagem…"></textarea><label>Anexo (imagem, PDF, Word; máximo 10 MB)</label><input id="cc-file" type="file" accept="image/jpeg,image/png,image/webp,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"><button class="ch-primary" onclick="riviorSendMessage()">Enviar mensagem / ficheiro</button><div class="ch-muted" id="cc-upload-status"></div><p class="ch-muted" style="margin-top:12px">🕑 As mensagens e os ficheiros apagam-se automaticamente ao fim de 2 dias.</p></div></div>`;
+  await window.riviorLoadBlocked();
+  window.riviorChatSearch();
+  riviorPurgeExpiredChat();
 }
-window.riviorChatFilter=function(){
-  const box=$('cc-people');if(!box||!window.__chatPeers)return;
-  const {peers,emptyMsg,isTeacher}=window.__chatPeers;
-  const lvl=$('cc-filter-class')?.value||'',term=String($('cc-search')?.value||'').trim().toLowerCase();
-  const list=peers.filter(p=>(!lvl||String(p.class_level)===lvl)&&(!term||String(p.full_name||'').toLowerCase().includes(term)));
-  if(!list.length){box.innerHTML='<p class="ch-muted">'+safe(peers.length?'Nenhum resultado para este filtro.':emptyMsg)+'</p>';return;}
-  const btn=p=>{const subs=(p.subjects||[]).join(', ');const label=p.role==='teacher'?('Prof. '+safe(p.full_name)+(subs?' · '+safe(subs):'')):(safe(p.full_name)+' · '+p.class_level+'.ª '+safe(p.class_group||'')+(subs?' · '+safe(subs):''));return '<button style="display:block;width:100%;text-align:left;margin:5px 0" onclick="riviorStartChat(\''+p.id+'\')">'+label+'</button>';};
-  if(isTeacher){let out='',cur=null;list.forEach(p=>{if(p.class_level!==cur){cur=p.class_level;out+='<div class="ch-muted" style="margin:10px 0 2px;font-weight:800">'+cur+'.ª Classe</div>';}out+=btn(p);});box.innerHTML=out;}
-  else box.innerHTML=list.map(btn).join('');
+let __ccTimer=null;
+window.riviorChatSearchDebounced=function(){clearTimeout(__ccTimer);__ccTimer=setTimeout(()=>window.riviorChatSearch(),250);};
+window.riviorChatSearch=async function(){
+  const box=$('cc-people');if(!box||!sb)return;
+  const term=String($('cc-search')?.value||'').trim();
+  const f=$('cc-filter')?.value||'';
+  const peerRow=p=>{
+    (window.__peerNames=window.__peerNames||{})[p.id]=p.full_name||'';
+    const isT=p.role==='teacher';
+    const sub=(p.subjects||[]).filter(Boolean).join(', ');
+    const meta=isT?('Professor'+(sub?' · '+safe(sub):'')):('Aluno · '+safe(p.class_level||'—')+'.ª'+(p.class_group?' '+safe(p.class_group):'')+(sub?' · '+safe(sub):''));
+    return '<button style="display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;text-align:left;margin:5px 0" onclick="riviorStartChat(\''+safe(p.id)+'\')"><span><b>'+(isT?'Prof. ':'')+safe(p.full_name||'Sem nome')+'</b><br><span class="ch-muted">'+meta+'</span></span><span aria-label="Enviar mensagem" style="font-size:20px">➤</span></button>';
+  };
+  if(term.length<2){
+    const sug=(window.__chatPeers?.peers||[]).filter(p=>!f||(f==='T'?p.role==='teacher':String(p.class_level)===f));
+    box.innerHTML=sug.length?'<div class="ch-muted" style="margin:6px 0 2px;font-weight:800">Os teus contactos</div>'+sug.map(peerRow).join(''):'<p class="ch-muted">Escreve pelo menos 2 letras do nome para pesquisar professores e colegas.</p>';
+    return;
+  }
+  box.innerHTML='<p class="ch-muted">A pesquisar…</p>';
+  let rows=null,errMsg='';
+  const args={q:term,cls:/^\d+$/.test(f)?Number(f):null,only_teachers:f==='T'};
+  const r=await sb.rpc('rivior_chat_directory',args);
+  if(!r.error){rows=r.data||[];}
+  else{
+    // Alternativa se o SQL ainda não foi executado: pesquisa directa (depende das permissões da conta).
+    let q=sb.from('profiles').select('id,full_name,role,class_level,class_group').neq('id',cloudUser.id).in('role',['student','teacher']).ilike('full_name','%'+term.replace(/[%_]/g,' ')+'%').limit(30);
+    if(f==='T')q=q.eq('role','teacher');else if(/^\d+$/.test(f))q=q.eq('role','student').eq('class_level',Number(f));
+    const r2=await q;
+    if(r2.error){errMsg=r2.error.message;}
+    else rows=(r2.data||[]).filter(p=>!(window.__myBlocks&&window.__myBlocks.has(p.id))&&(p.role==='teacher'||(Number(p.class_level)>=7&&Number(p.class_level)<=13)));
+  }
+  if(rows===null){box.innerHTML='<p class="ch-muted">Não foi possível pesquisar: '+safe(errMsg||r.error?.message||'erro')+'. Executa o ficheiro SQL «rivior_chat_pesquisa_e_2dias.sql» no Supabase.</p>';return;}
+  if(!rows.length){box.innerHTML='<p class="ch-muted">Ninguém encontrado com esse nome. A pessoa precisa de ter conta na plataforma.</p>';return;}
+  const profs=rows.filter(p=>p.role==='teacher'),alunos=rows.filter(p=>p.role!=='teacher');
+  box.innerHTML=(profs.length?'<div class="ch-muted" style="margin:6px 0 2px;font-weight:800">Professores</div>'+profs.map(peerRow).join(''):'')+(alunos.length?'<div class="ch-muted" style="margin:10px 0 2px;font-weight:800">Alunos</div>'+alunos.map(peerRow).join(''):'');
 };
-window.riviorStartChat=async(target)=>{const {data,error}=await sb.rpc('create_direct_conversation',{target_user:target});if(error){alert('Não foi possível iniciar a conversa: '+error.message);return;}activeConversation=data;const {data:peer}=await sb.from('profiles').select('full_name').eq('id',target).maybeSingle();$('cc-title').textContent='Conversa com '+(peer?.full_name||'utilizador');await loadMessages();if(realtimeChannel)sb.removeChannel(realtimeChannel);realtimeChannel=sb.channel('rivior-chat-'+data).on('postgres_changes',{event:'INSERT',schema:'public',table:'chat_messages',filter:'conversation_id=eq.'+data},()=>loadMessages()).on('postgres_changes',{event:'UPDATE',schema:'public',table:'chat_messages',filter:'conversation_id=eq.'+data},()=>loadMessages()).on('postgres_changes',{event:'DELETE',schema:'public',table:'chat_messages'},()=>loadMessages()).subscribe();};
+window.riviorChatFilter=window.riviorChatSearch;
+window.riviorStartChat=async(target)=>{if(await riviorIsBlocked(target))return alert('Não é possível enviar mensagens a esta pessoa.');const {data,error}=await sb.rpc('create_direct_conversation',{target_user:target});if(error){alert('Não foi possível iniciar a conversa: '+error.message);return;}activeConversation=data;window.__activePeer=target;const {data:peer}=await sb.from('profiles').select('full_name').eq('id',target).maybeSingle();const _t=$('cc-title');window.__activePeerName=peer?.full_name||(window.__peerNames||{})[target]||'';if(_t)_t.textContent='Conversa com '+(window.__activePeerName||'utilizador');const _b=$('cc-block');if(_b)_b.style.display='';await loadMessages();try{$('cc-title')?.scrollIntoView({behavior:'smooth',block:'start'});}catch(_){}if(realtimeChannel)sb.removeChannel(realtimeChannel);realtimeChannel=sb.channel('rivior-chat-'+data).on('postgres_changes',{event:'INSERT',schema:'public',table:'chat_messages',filter:'conversation_id=eq.'+data},()=>loadMessages()).on('postgres_changes',{event:'UPDATE',schema:'public',table:'chat_messages',filter:'conversation_id=eq.'+data},()=>loadMessages()).on('postgres_changes',{event:'DELETE',schema:'public',table:'chat_messages'},()=>loadMessages()).subscribe();};
 const BIG_FILE_BYTES=4*1024*1024;
-function chatTtlDays(){try{const v=Number(window.localStorage.getItem('rivior_chat_ttl_days'));return [3,7,15,30].includes(v)?v:7;}catch(_){return 7;}}
-window.riviorSetTtl=(v)=>{try{window.localStorage.setItem('rivior_chat_ttl_days',String(Number(v)));}catch(_){}loadMessages();};
+const CHAT_TTL_DAYS=2;
+function chatTtlDays(){return CHAT_TTL_DAYS;}
+window.riviorSetTtl=()=>{};
 function fmtSize(b){b=Number(b)||0;return b>=1048576?(b/1048576).toFixed(1)+' MB':Math.max(1,Math.round(b/1024))+' KB';}
 function canManageMsg(m){return m.sender_id===cloudUser.id||(cloudProfile&&cloudProfile.role==='teacher');}
-// Remove do armazenamento os ficheiros grandes que passaram do prazo. Falhas de permissão são ignoradas.
-async function sweepExpiredAttachments(rows){
-  const ttl=chatTtlDays()*86400000,now=Date.now();let changed=false;
-  for(const m of rows){
-    if(!m.attachment_path||!m.attachment_size||Number(m.attachment_size)<=BIG_FILE_BYTES)continue;
-    if(now-new Date(m.created_at).getTime()<ttl||!canManageMsg(m))continue;
-    try{
-      const rm=await sb.storage.from('rivior-chat-files').remove([m.attachment_path]);
-      if(rm.error)continue;
-      const up=await sb.from('chat_messages').update({attachment_path:null,attachment_expired:true}).eq('id',m.id);
-      if(!up.error){m.attachment_path=null;m.attachment_expired=true;changed=true;}
-    }catch(e){console.warn('Não foi possível expirar anexo:',e);}
-  }
-  return changed;
+function chatCutoffIso(){return new Date(Date.now()-CHAT_TTL_DAYS*86400000).toISOString();}
+// Apaga mensagens expiradas (2 dias) e os respectivos ficheiros. Apaga o que a conta tiver permissão para apagar; o resto é limpo pelo SQL agendado.
+async function riviorPurgeExpiredChat(){
+  if(!sb||!cloudUser)return;
+  try{
+    const q=await sb.from('chat_messages').select('id,sender_id,attachment_path').lt('created_at',chatCutoffIso()).limit(200);
+    if(q.error||!q.data||!q.data.length)return;
+    const paths=q.data.filter(m=>m.attachment_path).map(m=>m.attachment_path);
+    if(paths.length){try{await sb.storage.from('rivior-chat-files').remove(paths);}catch(e){console.warn('Ficheiros expirados não removidos:',e);}}
+    const ids=q.data.map(m=>m.id);
+    await sb.from('chat_messages').delete().in('id',ids);
+  }catch(e){console.warn('Limpeza de mensagens expiradas falhou:',e);}
+}
+window.riviorPurgeExpiredChat=riviorPurgeExpiredChat;
+function expiryLabel(createdAt){
+  const left=new Date(createdAt).getTime()+CHAT_TTL_DAYS*86400000-Date.now();
+  if(left<=0)return 'a expirar';
+  const h=Math.ceil(left/3600000);
+  return h>=24?'apaga-se em '+Math.ceil(h/24)+' d':'apaga-se em '+h+' h';
 }
 async function loadMessages(){
   if(!activeConversation)return;const box=$('cc-messages');if(!box)return;
-  let q=await sb.from('chat_messages').select('id,sender_id,body,attachment_name,attachment_path,attachment_size,attachment_expired,created_at').eq('conversation_id',activeConversation).order('created_at');
-  if(q.error&&/attachment_size|attachment_expired/.test(q.error.message||'')){q=await sb.from('chat_messages').select('id,sender_id,body,attachment_name,attachment_path,created_at').eq('conversation_id',activeConversation).order('created_at');}
+  const cutoff=chatCutoffIso();
+  let q=await sb.from('chat_messages').select('id,sender_id,body,attachment_name,attachment_path,attachment_size,attachment_expired,created_at').eq('conversation_id',activeConversation).gte('created_at',cutoff).order('created_at');
+  if(q.error&&/attachment_size|attachment_expired/.test(q.error.message||'')){q=await sb.from('chat_messages').select('id,sender_id,body,attachment_name,attachment_path,created_at').eq('conversation_id',activeConversation).gte('created_at',cutoff).order('created_at');}
   if(q.error){box.textContent='Erro: '+q.error.message;return;}
   const data=q.data||[];
-  await sweepExpiredAttachments(data);
-  const ttlMs=chatTtlDays()*86400000;
+  riviorPurgeExpiredChat();
   box.innerHTML=data.map(m=>{
     const mine=m.sender_id===cloudUser.id,manage=canManageMsg(m);
     let att='';
     if(m.attachment_path){
-      const big=Number(m.attachment_size)>BIG_FILE_BYTES;
-      const left=big?Math.max(0,Math.ceil((new Date(m.created_at).getTime()+ttlMs-Date.now())/86400000)):null;
-      att='<br><button onclick="riviorDownloadFile(\''+m.id+'\')">📎 '+safe(m.attachment_name||'Anexo')+(m.attachment_size?' · '+fmtSize(m.attachment_size):'')+'</button>'+(manage?' <button title="Apagar só o ficheiro" onclick="riviorDeleteAttachment(\''+m.id+'\')">🗑 ficheiro</button>':'')+(big?'<div class="ch-muted">Ficheiro grande: apaga-se automaticamente em '+left+' dia(s).</div>':'');
+      att='<br><button onclick="riviorDownloadFile(\''+m.id+'\')">📎 '+safe(m.attachment_name||'Anexo')+(m.attachment_size?' · '+fmtSize(m.attachment_size):'')+'</button>'+(manage?' <button title="Apagar só o ficheiro" onclick="riviorDeleteAttachment(\''+m.id+'\')">🗑 ficheiro</button>':'');
     }else if(m.attachment_expired||m.attachment_name){
-      att='<div class="ch-muted">📎 '+safe(m.attachment_name||'Ficheiro')+' — ficheiro apagado'+(m.attachment_expired?' (expirou)':'')+'.</div>';
+      att='<div class="ch-muted">📎 '+safe(m.attachment_name||'Ficheiro')+' — ficheiro apagado.</div>';
     }
-    return '<div class="ch-msg '+(mine?'mine':'')+'">'+safe(m.body||'')+att+'<div class="ch-muted">'+new Date(m.created_at).toLocaleString('pt-PT')+(manage?' · <a href="#" style="color:inherit" onclick="riviorDeleteMessage(\''+m.id+'\');return false">apagar mensagem</a>':'')+'</div></div>';
-  }).join('')||'<p class="ch-muted">Ainda não há mensagens.</p>';
+    return '<div class="ch-msg '+(mine?'mine':'')+'">'+safe(m.body||'')+att+'<div class="ch-muted">'+new Date(m.created_at).toLocaleString('pt-PT')+' · '+expiryLabel(m.created_at)+(manage?' · <a href="#" style="color:inherit" onclick="riviorDeleteMessage(\''+m.id+'\');return false">apagar mensagem</a>':'')+'</div></div>';
+  }).join('')||'<p class="ch-muted">Ainda não há mensagens. Escreve a primeira.</p>';
   box.scrollTop=box.scrollHeight;
 }
 window.riviorDeleteAttachment=async(id)=>{
@@ -5894,6 +5929,46 @@ window.riviorDeleteMessage=async(id)=>{
 window.riviorSendMessage=async()=>{if(!activeConversation)return alert('Escolhe primeiro uma conversa.');const body=$('cc-text').value.trim(),file=$('cc-file').files[0];if(!body&&!file)return;let attachment_path=null,attachment_name=null,attachment_size=null;if(file){const allowed=['image/jpeg','image/png','image/webp','application/pdf','application/msword','application/vnd.openxmlformats-officedocument.wordprocessingml.document'];if(!allowed.includes(file.type)||file.size>10*1024*1024)return alert('Formato não permitido ou ficheiro superior a 10 MB.');attachment_name=file.name;attachment_size=file.size;const path=activeConversation+'/'+cloudUser.id+'/'+crypto.randomUUID()+'-'+file.name.replace(/[^a-zA-Z0-9._-]/g,'_');$('cc-upload-status').textContent='A enviar ficheiro…';const up=await sb.storage.from('rivior-chat-files').upload(path,file,{contentType:file.type,upsert:false});if(up.error)return alert('Falha no envio: '+up.error.message);attachment_path=path;}
 let ins=await sb.from('chat_messages').insert({conversation_id:activeConversation,sender_id:cloudUser.id,body:body||'',attachment_path,attachment_name,attachment_size});if(ins.error&&/attachment_size/.test(ins.error.message||'')){ins=await sb.from('chat_messages').insert({conversation_id:activeConversation,sender_id:cloudUser.id,body:body||'',attachment_path,attachment_name});}const error=ins.error;if(error){if(attachment_path)await sb.storage.from('rivior-chat-files').remove([attachment_path]);return alert('Falha ao enviar mensagem: '+error.message);} $('cc-text').value='';$('cc-file').value='';$('cc-upload-status').textContent='';await loadMessages();};
 window.riviorDownloadFile=async(messageId)=>{const {data,error}=await sb.from('chat_messages').select('attachment_path,attachment_name').eq('id',messageId).single();if(error||!data?.attachment_path)return alert('Anexo não encontrado ou sem permissão.');const {data:link,error:e}=await sb.storage.from('rivior-chat-files').createSignedUrl(data.attachment_path,60);if(e)return alert('Acesso negado: '+e.message);const a=document.createElement('a');a.href=link.signedUrl;a.download=data.attachment_name||'anexo';a.target='_blank';a.rel='noopener';a.click();};
+
+/* ===== BLOQUEAR PESSOAS NO CHAT ===== */
+window.__myBlocks=new Set();
+async function riviorIsBlocked(id){
+  if(window.__myBlocks&&window.__myBlocks.has(id))return true;
+  try{const r=await sb.rpc('rivior_is_blocked_between',{other:id});return r.error?false:!!r.data;}catch(_){return false;}
+}
+window.riviorLoadBlocked=async function(){
+  const box=$('cc-blocked');
+  const q=await sb.from('chat_blocks').select('blocked_id,blocked_name,created_at').eq('blocker_id',cloudUser.id).order('created_at',{ascending:false});
+  if(q.error){window.__myBlocks=new Set();if(box)box.innerHTML='';return;}
+  const rows=q.data||[];
+  window.__myBlocks=new Set(rows.map(b=>b.blocked_id));
+  if(box)box.innerHTML=rows.length?'<div class="ch-muted" style="margin:12px 0 2px;font-weight:800">Bloqueados</div>'+rows.map(b=>'<div class="ch-row" style="align-items:center;justify-content:space-between;margin:4px 0"><span>'+safe(b.blocked_name||'Utilizador')+'</span><button onclick="riviorUnblock(\''+safe(b.blocked_id)+'\')">Desbloquear</button></div>').join(''):'';
+};
+window.riviorBlockActive=async function(){
+  const id=window.__activePeer;if(!id)return;
+  const nome=window.__activePeerName||'esta pessoa';
+  if(!confirm('Bloquear '+nome+'? Não poderão trocar mensagens e deixam de aparecer um ao outro na pesquisa. Podes desbloquear depois.'))return;
+  const r=await sb.from('chat_blocks').upsert({blocker_id:cloudUser.id,blocked_id:id,blocked_name:nome},{onConflict:'blocker_id,blocked_id'});
+  if(r.error)return alert('Não foi possível bloquear: '+r.error.message+'\nExecuta o ficheiro SQL «rivior_chat_bloqueio.sql» no Supabase.');
+  activeConversation=null;window.__activePeer=null;
+  try{if(realtimeChannel){sb.removeChannel(realtimeChannel);realtimeChannel=null;}}catch(_){}
+  const m=$('cc-messages');if(m)m.innerHTML='<p class="ch-muted">Pessoa bloqueada.</p>';
+  const t=$('cc-title');if(t)t.textContent='Mensagens';
+  const b=$('cc-block');if(b)b.style.display='none';
+  await window.riviorLoadBlocked();window.riviorChatSearch();
+};
+window.riviorUnblock=async function(id){
+  const r=await sb.from('chat_blocks').delete().eq('blocker_id',cloudUser.id).eq('blocked_id',id);
+  if(r.error)return alert('Não foi possível desbloquear: '+r.error.message);
+  await window.riviorLoadBlocked();window.riviorChatSearch();
+};
+(function(){
+  const _send=window.riviorSendMessage;
+  window.riviorSendMessage=async function(){
+    if(window.__activePeer&&await riviorIsBlocked(window.__activePeer))return alert('Não é possível enviar mensagens a esta pessoa.');
+    return _send.apply(this,arguments);
+  };
+})();
 /* ===== ETAPA 13 — ASSIDUIDADE E FALTAS ===== */
 async function renderAttendance(c){
   if(!cloudProfile||!['teacher','manager'].includes(cloudProfile.role)){c.innerHTML='<div class="ch-card">Sem permissão para consultar a assiduidade.</div>';return;}
@@ -5935,7 +6010,7 @@ window.doLogin=async function(){
   const password=(creating?$('in-password-signup')?.value:$('in-password')?.value)||'';
   if(!email||!email.includes('@'))return notify('Introduz um email válido.');
   if(password.length<6)return notify('A senha deve ter pelo menos 6 caracteres.');
-  const client=window.RIVIOR_CLOUD?.client||window.__RIVIOR_SUPABASE_CLIENT||window.supabase.createClient('https://nbymepgoztensexxubvj.supabase.co','sb_publishable_xaSDr3kW1PTDXDQ6z71pLw_KFXZCSDJ',{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
+  const client=window.RIVIOR_CLOUD?.client||window.__RIVIOR_SUPABASE_CLIENT||window.supabase.createClient(window.RIVIOR_CFG.url,window.RIVIOR_CFG.key,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
   sb=client;
   window.__RIVIOR_SUPABASE_CLIENT=client;
   const btn=document.querySelector('#view-login .btn.gold');if(btn)btn.disabled=true;
@@ -5974,7 +6049,7 @@ async function renderStudentDirectory(c){
   const {data,error}=await sb.from('profiles').select('id,full_name,role,class_level,class_group,student_number,period').eq('role','student').order('full_name').limit(2000);
   if(error){$('dir-results').textContent='Não foi possível pesquisar: '+error.message;return;}window.__riviorDirectory=data||[];riviorFilterDirectory();
 }
-window.riviorFilterDirectory=function(){const box=$('dir-results');if(!box)return;const q=($('dir-query')?.value||'').trim().toLowerCase();const rows=(window.__riviorDirectory||[]).filter(s=>!q||[s.full_name,s.student_number,s.class_level,s.class_group].some(v=>String(v||'').toLowerCase().includes(q)));box.innerHTML=rows.slice(0,100).map(s=>`<div class="ch-stu"><b>${safe(s.full_name)}</b><div class="ch-muted">${safe(s.student_number||'Sem número')} · ${safe(s.class_level||'—')}.ª classe · Turma ${safe(s.class_group||'—')} · ${safe(s.period||'—')}</div><button onclick="riviorViewDirectoryStudent('${s.id}')">Consultar ficha</button></div>`).join('')||'<p class="ch-muted">Nenhum aluno encontrado.</p>';if(rows.length>100)box.insertAdjacentHTML('beforeend','<p class="ch-muted">Mostrados os primeiros 100 resultados. Refina a pesquisa.</p>');};
+window.riviorFilterDirectory=function(){const box=$('dir-results');if(!box)return;const q=($('dir-query')?.value||'').trim().toLowerCase();const rows=(window.__riviorDirectory||[]).filter(s=>!q||[s.full_name,s.student_number,s.class_level,s.class_group].some(v=>String(v||'').toLowerCase().includes(q)));box.innerHTML=rows.slice(0,100).map(s=>`<div class="ch-stu"><b>${safe(s.full_name)}</b><div class="ch-muted">${safe(s.student_number||'Sem número')} · ${safe(s.class_level||'—')}.ª classe · Turma ${safe(s.class_group||'—')} · ${safe(s.period||'—')}</div><div class="ch-row"><button onclick="riviorViewDirectoryStudent('${s.id}')">Consultar ficha</button><button onclick="riviorChatWith('${safe(s.id)}')">💬 Falar</button></div></div>`).join('')||'<p class="ch-muted">Nenhum aluno encontrado.</p>';if(rows.length>100)box.insertAdjacentHTML('beforeend','<p class="ch-muted">Mostrados os primeiros 100 resultados. Refina a pesquisa.</p>');};
 window.riviorViewDirectoryStudent=async function(id){const s=(window.__riviorDirectory||[]).find(x=>x.id===id);if(!s)return;const {data,error}=await sb.from('grades').select('id,subject,term,assessment_label,score,created_at').eq('student_id',id).eq('academic_year_id',window.__riviorActiveYearId).order('subject').order('term');if(error)return alert('A ficha do aluno foi encontrada, mas as notas não podem ser consultadas com as permissões actuais: '+error.message);const as=cloudProfile.role==='teacher'?await getMyAssignments():[];const canEdit=cloudProfile.role==='manager'||(as||[]).length>0;const rows=data||[];const filtered=cloudProfile.role==='manager'?rows:rows.filter(g=>teacherHasAssignment(as,s,g.subject));
 const gradesHtml=filtered.length?gradeTable(filtered):'<p class="ch-muted">Não há notas visíveis para a tua função/atribuições.</p>';
 const title=`Ficha de ${safe(s.full_name)}`;const c=$('ch-content');c.innerHTML=`<div class="ch-card"><button onclick="riviorCloudTab('directory')">← Voltar à pesquisa</button><h3>${title}</h3><p class="ch-muted">${safe(s.class_level)}.ª classe · Turma ${safe(s.class_group||'—')} · Nº ${safe(s.student_number||'—')}</p><h3>Notas consultáveis</h3>${gradesHtml}<p class="ch-muted">Consulta global de alunos activada. Alterações só aparecem na área de notas e são validadas também pelo RLS do Supabase.</p></div>`;};
@@ -6401,7 +6476,7 @@ const boot=()=>{init();setTimeout(riviorSignupRoleChanged,100);};if(document.rea
   if(window.RIVIOR_CLOUD&&window.RIVIOR_CLOUD.client)return window.RIVIOR_CLOUD.client;
   if(window.__RIVIOR_SUPABASE_CLIENT)return window.__RIVIOR_SUPABASE_CLIENT;
   if(!window.supabase||!window.supabase.createClient)throw new Error('A biblioteca Supabase não carregou. Actualiza a página.');
-  window.__RIVIOR_SUPABASE_CLIENT=window.supabase.createClient('https://nbymepgoztensexxubvj.supabase.co','sb_publishable_xaSDr3kW1PTDXDQ6z71pLw_KFXZCSDJ',{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
+  window.__RIVIOR_SUPABASE_CLIENT=window.supabase.createClient(window.RIVIOR_CFG.url,window.RIVIOR_CFG.key,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
   return window.__RIVIOR_SUPABASE_CLIENT;
  }
  function msg(id,text){var e=document.getElementById(id);if(e)e.textContent=text;}
@@ -6546,8 +6621,8 @@ window.MathJax = { tex: { inlineMath: [['$','$'], ['\\(','\\)']], displayMath: [
 <script>
 (function(){
  'use strict';
- const URL_BASE='https://nbymepgoztensexxubvj.supabase.co';
- const PUBLIC_KEY='sb_publishable_xaSDr3kW1PTDXDQ6z71pLw_KFXZCSDJ';
+ const URL_BASE=window.RIVIOR_CFG.url;
+ const PUBLIC_KEY=window.RIVIOR_CFG.key;
  const $=id=>document.getElementById(id);
  const panel=$('rivior-ai-panel'), messages=$('rivior-ai-messages'), form=$('rivior-ai-form'), input=$('rivior-ai-input'), send=$('rivior-ai-send');
  // Nunca mostrar o botão nem o painel de IA no ecrã de autenticação.
@@ -6675,7 +6750,7 @@ window.MathJax = { tex: { inlineMath: [['$','$'], ['\\(','\\)']], displayMath: [
  if(typeof prevEnter==='function'&&!window.__riviorEmailGateWrapped){window.__riviorEmailGateWrapped=true;window.enterCloud=async function(user){const out=await prevEnter(user);banner(user);const launch=$('rivior-ai-launch');if(launch)launch.style.setProperty('display',(user&&window.RIVIOR_CLOUD?.profile&&$('view-login')?.classList.contains('hidden'))?'block':'none','important');return out;};}
  const prevTab=window.riviorCloudTab;
  if(typeof prevTab==='function'&&!window.__riviorGradeGateWrapped){window.__riviorGradeGateWrapped=true;window.riviorCloudTab=async function(tab='grades'){const user=window.RIVIOR_CLOUD?.user;const profile=window.RIVIOR_CLOUD?.profile;if(tab==='grades'&&profile?.role==='student'&&!verified(user)){const hub=$('ch-content');if(hub)hub.innerHTML='<div class="ch-card"><h3>🔒 Notas temporariamente bloqueadas</h3><p>Confirma o teu email para consultar notas e médias. O resto das áreas de aprendizagem continua disponível.</p><p>Abre a mensagem de confirmação enviada para <b>'+String(user?.email||'o teu email').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))+'</b> e carrega no botão de confirmação. Depois termina sessão e entra novamente.</p><button onclick="riviorCloudLogout()">Sair e voltar a entrar</button></div>';return;}return prevTab(tab);};}
- const startAuthWatch=()=>{if(window.supabase&&window.supabase.createClient){try{const c=client()||window.supabase.createClient('https://nbymepgoztensexxubvj.supabase.co','sb_publishable_xaSDr3kW1PTDXDQ6z71pLw_KFXZCSDJ',{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});c.auth.getSession().then(({data})=>{if(data?.session){banner(data.session.user);const launch=$('rivior-ai-launch');if(launch&&window.RIVIOR_CLOUD?.profile&&$('view-login')?.classList.contains('hidden'))launch.style.setProperty('display','block','important');}});c.auth.onAuthStateChange((_e,session)=>{const launch=$('rivior-ai-launch');if(launch)launch.style.setProperty('display',(session&&window.RIVIOR_CLOUD?.profile&&$('view-login')?.classList.contains('hidden'))?'block':'none','important');if(session)banner(session.user);else{$('rivior-email-verification-banner')?.remove();}});}catch(e){console.warn('Rivior auth init',e);}}};
+ const startAuthWatch=()=>{if(window.supabase&&window.supabase.createClient){try{const c=client()||window.supabase.createClient(window.RIVIOR_CFG.url,window.RIVIOR_CFG.key,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});c.auth.getSession().then(({data})=>{if(data?.session){banner(data.session.user);const launch=$('rivior-ai-launch');if(launch&&window.RIVIOR_CLOUD?.profile&&$('view-login')?.classList.contains('hidden'))launch.style.setProperty('display','block','important');}});c.auth.onAuthStateChange((_e,session)=>{const launch=$('rivior-ai-launch');if(launch)launch.style.setProperty('display',(session&&window.RIVIOR_CLOUD?.profile&&$('view-login')?.classList.contains('hidden'))?'block':'none','important');if(session)banner(session.user);else{$('rivior-email-verification-banner')?.remove();}});}catch(e){console.warn('Rivior auth init',e);}}};
  /* espera pelo boot() do sistema principal, para reutilizar o cliente único em vez de criar outro */
  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',startAuthWatch);else startAuthWatch();
 })();
