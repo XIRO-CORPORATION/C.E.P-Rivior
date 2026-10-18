@@ -5984,13 +5984,13 @@ window.closeGuardianPortal=function(){hide('view-guardian-auth');showBG('buildin
 window.switchGuardianAuth=function(mode){renderCloudGuardianAuth(mode==='register'?'register':'login');};
 window.guardianRegister=async function(){
   const err=$('guardian-register-err');if(err)err.textContent='';
-  if(!configured())return err.textContent='Supabase não está configurado.';
+  if(!configured())return err.textContent='O serviço de acesso está temporariamente indisponível. Tenta novamente dentro de instantes.';
   const name=($('g-cloud-name')?.value||'').trim(),email=($('g-cloud-reg-email')?.value||'').trim().toLowerCase(),pw=$('g-cloud-reg-password')?.value||'',cf=$('g-cloud-reg-confirm')?.value||'';
   if(name.length<3)return err.textContent='Introduz o nome completo.';if(!email.includes('@'))return err.textContent='Introduz um email válido.';if(pw.length<8)return err.textContent='A senha deve ter pelo menos 8 caracteres.';if(pw!==cf)return err.textContent='As senhas não coincidem.';
   try{const {data,error}=await sb.auth.signUp({email,password:pw,options:{emailRedirectTo:window.location.origin+window.location.pathname,data:{role:'guardian',full_name:name}}});if(error)throw error;if(data.session&&data.user){await enterCloud(data.user);}else{err.textContent='Conta criada. Confirma o email recebido e depois entra com o teu email e senha. Após entrar, pede a associação ao educando pelo número e nome oficiais.';}}
   catch(e){err.textContent='Não foi possível criar a conta: '+(e.message||'erro de autenticação.');}
 };
-window.guardianLogin=async function(){const err=$('guardian-login-err');if(err)err.textContent='';if(!configured())return err.textContent='Supabase não está configurado.';const email=($('g-cloud-email')?.value||'').trim().toLowerCase(),password=$('g-cloud-password')?.value||'';if(!email||!password)return err.textContent='Preenche email e senha.';try{const {data,error}=await sb.auth.signInWithPassword({email,password});if(error)throw error;await enterCloud(data.user);}catch(e){err.textContent='Email ou senha inválidos, ou conta ainda não confirmada.';}};
+window.guardianLogin=async function(){const err=$('guardian-login-err');if(err)err.textContent='';if(!configured())return err.textContent='O serviço de acesso está temporariamente indisponível. Tenta novamente dentro de instantes.';const email=($('g-cloud-email')?.value||'').trim().toLowerCase(),password=$('g-cloud-password')?.value||'';if(!email||!password)return err.textContent='Preenche email e senha.';try{const {data,error}=await sb.auth.signInWithPassword({email,password});if(error)throw error;await enterCloud(data.user);}catch(e){err.textContent='Email ou senha inválidos, ou conta ainda não confirmada.';}};
 window.guardianLogout=async function(){if(sb)await sb.auth.signOut();cloudUser=null;cloudProfile=null;window.RIVIOR_CLOUD=null;hide('view-guardian-dash');hide('view-guardian-auth');showBG('building');show('view-login');switchTab('entrar');};
 window.guardianTab=function(tab,btn){document.querySelectorAll('.guardian-nav button').forEach(x=>x.classList.remove('active'));if(btn)btn.classList.add('active');if(tab==='grades'||tab==='home'||tab==='evolution'||tab==='teacher'||tab==='profile')guardianRefreshDashboard();};
 async function openCloudGuardianDashboard(){hide('view-login');hide('view-dash');hide('view-teacher');hide('view-guardian-auth');showBG('universe');show('view-guardian-dash');const oldNav=document.querySelector('.guardian-nav');if(oldNav)oldNav.style.display='none';$('guardian-code-label').textContent=cloudUser.email||'Conta autenticada';$('guardian-summary').innerHTML='<div class="eyebrow">ÁREA DO ENCARREGADO</div><h2>Bem-vindo, '+safe(cloudProfile.full_name||'Encarregado')+'</h2><p class="lead">A consulta de dados só fica disponível depois da validação do ADM.</p>';$('guardian-content').innerHTML='<div class="guardian-section"><h2>Solicitar associação ao educando</h2><p class="lead">Introduz o número oficial do aluno e o nome completo exatamente como estão registados na secretaria. Não é apresentada uma lista pública de alunos.</p><label>Número oficial do aluno</label><input id="g-link-number" maxlength="50" placeholder="Número de aluno"><label>Nome completo do aluno</label><input id="g-link-student-name" maxlength="120" placeholder="Nome conforme registo escolar"><label>Parentesco</label><select id="g-link-relation"><option>Pai</option><option>Mãe</option><option>Avô/Avó</option><option>Tio/Tia</option><option>Tutor</option><option>Outro</option></select><button class="btn gold block" onclick="guardianRequestLink()">Enviar pedido ao ADM</button><div id="g-link-status" class="lead"></div></div><div id="g-cloud-data"></div>';await guardianRefreshDashboard();}
@@ -6421,7 +6421,7 @@ const boot=()=>{init();setTimeout(riviorSignupRoleChanged,100);};if(document.rea
 
 <!-- Assistente IA Rivior: interface integrada com a Edge Function rivior-assistant -->
 <style>
-#rivior-ai-launch{display:none;position:fixed;right:16px;bottom:calc(18px + env(safe-area-inset-bottom));z-index:9998;border:0;border-radius:999px;padding:13px 17px;background:linear-gradient(135deg,#7c5cff,#2563eb);color:white;font-weight:800;font-size:14px;box-shadow:0 8px 28px #0008;cursor:pointer}
+#rivior-ai-launch{display:none!important;position:fixed;right:16px;bottom:calc(18px + env(safe-area-inset-bottom));z-index:9998;border:0;border-radius:999px;padding:13px 17px;background:linear-gradient(135deg,#7c5cff,#2563eb);color:white;font-weight:800;font-size:14px;box-shadow:0 8px 28px #0008;cursor:pointer}
 #rivior-ai-panel{position:fixed;inset:0;z-index:10002;background:rgba(2,6,16,.78);backdrop-filter:blur(7px);display:none;padding:12px;box-sizing:border-box;color:#edf3ff;font-family:inherit}
 #rivior-ai-panel.open{display:flex;align-items:center;justify-content:center}
 #rivior-ai-panel .rai-window{width:min(760px,100%);height:min(850px,96dvh);display:flex;flex-direction:column;background:#091329;border:1px solid #344566;border-radius:18px;overflow:hidden;box-shadow:0 18px 70px #0009}
@@ -6481,10 +6481,10 @@ window.MathJax = { tex: { inlineMath: [['$','$'], ['\\(','\\)']], displayMath: [
  function open(){refreshSession().then(()=>{if(!accessToken){addMessage('Para utilizar o Assistente IA, inicia sessão na tua conta do Rivior.','bot');return;}panel.classList.add('open');document.body.style.overflow='hidden';setTimeout(()=>input.focus(),100);});}
  function close(){panel.classList.remove('open');document.body.style.overflow='';}
  async function refreshSession(){
-  try{if(!authClient)return;const {data}=await authClient.auth.getSession();accessToken=data.session?.access_token||null;const launch=$('rivior-ai-launch');if(launch)launch.style.display=accessToken?'block':'none';
-   if(data.session?.user){const {data:p}=await authClient.from('profiles').select('role,class_level,class_group,period').eq('id',data.session.user.id).maybeSingle();profile=p||null;
+  try{if(!authClient)return;const {data}=await authClient.auth.getSession();accessToken=data.session?.access_token||null;const launch=$('rivior-ai-launch');if(launch)launch.style.setProperty('display',(accessToken&&profile)?'block':'none','important');
+   if(data.session?.user){const {data:p}=await authClient.from('profiles').select('role,class_level,class_group,period').eq('id',data.session.user.id).maybeSingle();profile=p||null;const launchAfterProfile=$('rivior-ai-launch');if(launchAfterProfile)launchAfterProfile.style.setProperty('display',(accessToken&&profile)?'block':'none','important');
     if(profile){const role=String(profile.role||'').toLowerCase();const isTeacher=['teacher','professor','professor(a)','manager'].includes(role);$('rivior-ai-mode').innerHTML=isTeacher?'<option value="professor">Professor — aulas e avaliações</option>':'<option value="aluno">Aluno — aprender e preparar provas</option>';$('rivior-ai-mode').value=isTeacher?'professor':'aluno';$('rivior-ai-mode').disabled=true;$('rivior-ai-mode').closest('label').style.opacity='.85';$('rivior-ai-mode').closest('label').title=isTeacher?'Perfil de professor: assistente pedagógico':'Perfil de aluno: assistente de aprendizagem';if(profile.class_level&&!$('rivior-ai-class').value)$('rivior-ai-class').value=profile.class_level+'ª classe';$('rivior-ai-subject').value=$('rivior-ai-subject').value||'Geral';}
-   }else{profile=null;const launch=$('rivior-ai-launch');if(launch)launch.style.display='none';$('rivior-ai-mode').disabled=true;}
+   }else{profile=null;const launch=$('rivior-ai-launch');if(launch)launch.style.setProperty('display','none','important');$('rivior-ai-mode').disabled=true;}
   }catch(e){console.warn('Rivior IA: não foi possível ler a sessão',e);}
  }
  if(authClient){authClient.auth.onAuthStateChange(()=>{setTimeout(refreshSession,0);});refreshSession();}
@@ -6508,5 +6508,88 @@ window.MathJax = { tex: { inlineMath: [['$','$'], ['\\(','\\)']], displayMath: [
 })();
 </script>
 
+
+<script id="rivior-auth-final-fix">
+(function(){
+ 'use strict';
+ const $=id=>document.getElementById(id);
+ const client=()=>window.RIVIOR_CLOUD?.client||window.__RIVIOR_SUPABASE_CLIENT;
+ const say=t=>{const e=$('login-err');if(e){e.textContent=t;e.style.display='block';}else alert(t);};
+ const verified=u=>!!(u&&(u.email_confirmed_at||u.confirmed_at));
+ function banner(user){
+   const old=$('rivior-email-verification-banner'); if(old)old.remove();
+   if(!user||verified(user))return;
+   const b=document.createElement('div');b.id='rivior-email-verification-banner';
+   b.style.cssText='position:relative;z-index:10001;margin:12px auto;padding:14px 16px;max-width:950px;border:1px solid #f0bd4e;border-radius:12px;background:#3a2b0d;color:#fff2c7;font-weight:650;line-height:1.5';
+   b.innerHTML='<strong>⚠️ Verifica o teu email para activar a conta completamente.</strong><br>Já podes utilizar as áreas de aprendizagem, mas as notas e médias ficam bloqueadas até confirmares o endereço. Abre a mensagem enviada pelo Rivior/Supabase e carrega no botão de confirmação. Verifica também a pasta Spam.';
+   document.body.prepend(b);
+ }
+ window.doLogin=async function(){
+   const creating=!!$('tabCriar')?.classList.contains('active');
+   const email=String((creating?($('in-email-signup')?.value||''):($('in-username')?.value||''))).trim().toLowerCase();
+   const password=String((creating?($('in-password-signup')?.value||''):($('in-password')?.value||'')));
+   const btn=document.querySelector('#view-login .btn.gold');
+   if(!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)){say('Introduz o email completo usado na conta. O nome de utilizador sozinho não serve para entrar.');return;}
+   if(password.length<6){say('A senha deve ter pelo menos 6 caracteres.');return;}
+   const c=client(); if(!c){say('O serviço de acesso está temporariamente indisponível. Verifica a ligação à internet e tenta novamente dentro de instantes.');return;}
+   if(creating){
+     const nome=String($('in-nome')?.value||'').trim();
+     const confirm=String($('in-password-confirm')?.value||'');
+     const role=String($('in-account-type')?.value||'student');
+     if(!nome){say('Indica o nome completo.');return;}
+     if(password!==confirm){say('As duas senhas não coincidem.');return;}
+     let metadata={full_name:nome,role:role==='teacher'?'teacher':'student'};
+     if(role==='student'){
+       const numero=String($('in-numero')?.value||'').trim(),classe=$('in-classe')?.value,turma=String($('in-turma')?.value||'').trim(),periodo=$('in-periodo')?.value,sexo=$('in-sexo')?.value,nascimento=$('in-nascimento')?.value,username=String($('in-username-signup')?.value||'').trim();
+       if(!numero||!classe||!turma||!periodo||!sexo||!nascimento||!username){say('Preenche todos os campos escolares obrigatórios.');return;}
+       metadata={...metadata,student_number:numero,class_level:Number(classe),class_group:turma,period:periodo,sex:sexo,birth_date:nascimento,username};
+     }
+     if(btn)btn.disabled=true;
+     try{
+       const r=await c.auth.signUp({email,password,options:{emailRedirectTo:window.location.origin+window.location.pathname,data:metadata}});
+       if(r.error)throw r.error;
+       if(!r.data.user)throw new Error('O Supabase não devolveu a conta criada. Tenta novamente.');
+       if(r.data.session){
+         await new Promise(resolve=>setTimeout(resolve,350));
+         if(typeof window.enterCloud==='function')await window.enterCloud(r.data.user);
+         banner(r.data.user);
+         say(verified(r.data.user)?'Conta criada e sessão iniciada com sucesso.':'Conta criada e sessão iniciada. Confirma o email para activar todas as funções; as notas ficam bloqueadas até à confirmação.');
+       }else{
+         say('A conta foi criada, mas o Supabase está configurado para exigir confirmação antes de criar uma sessão. Abre o email de confirmação e depois entra. Para permitir entrada imediata com acesso parcial, o administrador precisa ajustar a opção de confirmação de email no Supabase; o HTML não pode desactivar essa regra de segurança.');
+       }
+     }catch(e){
+       let m=e?.message||'Erro desconhecido';
+       if(/already registered|already been registered|user already exists/i.test(m))m='Este email já tem uma conta. Usa Entrar ou recupera a senha.';
+       if(/already registered|already been registered|user already exists/i.test(m))say('Este e-mail já tem uma conta. Usa Entrar ou recupera a senha.');
+       else if(/fetch|network|failed to fetch|timeout|load failed/i.test(m))say('Não foi possível contactar o serviço de registo. Verifica a internet e tenta novamente.');
+       else say('Não foi possível concluir o registo. Confirma os dados e tenta novamente. Se o problema continuar, contacta o administrador.');
+     }finally{if(btn)btn.disabled=false;}
+     return;
+   }
+   if(btn)btn.disabled=true;
+   try{
+     const r=await c.auth.signInWithPassword({email,password});
+     if(r.error)throw r.error;
+     if(!r.data.user)throw new Error('O Supabase não devolveu um utilizador autenticado.');
+     if(typeof window.enterCloud==='function')await window.enterCloud(r.data.user);
+     banner(r.data.user);
+     if(!verified(r.data.user))say('Sessão iniciada. ⚠️ Confirma o teu email para activar todas as funções. As notas e médias ficam bloqueadas até à confirmação.');
+   }catch(e){
+     const m=e?.message||'';
+     if(/invalid login credentials/i.test(m))say('E-mail ou senha incorretos. Confirma os dados e tenta novamente. Se acabaste de criar a conta, verifica o teu e-mail para a confirmar.');
+     else if(/email not confirmed/i.test(m))say('A tua conta ainda precisa de confirmação. Abre o e-mail de confirmação e segue as instruções para entrar.');
+     else if(/fetch|network|failed to fetch|timeout|load failed/i.test(m))say('Não foi possível contactar o serviço de acesso. Verifica a internet e tenta novamente.');
+     else if(/profile|perfi[l]? escolar|row-level security|permission denied/i.test(m))say('A conta foi reconhecida, mas o perfil escolar não está pronto ou não tem permissão. Contacta o administrador para corrigir o perfil.');
+     else say('Não foi possível concluir o início de sessão. Tenta novamente; se o erro continuar, contacta o administrador.');
+   }finally{if(btn)btn.disabled=false;}
+ };
+ window.createAccount=async()=>window.doLogin();
+ const prevEnter=window.enterCloud;
+ if(typeof prevEnter==='function'&&!window.__riviorEmailGateWrapped){window.__riviorEmailGateWrapped=true;window.enterCloud=async function(user){const out=await prevEnter(user);banner(user);const launch=$('rivior-ai-launch');if(launch)launch.style.setProperty('display',(user&&window.RIVIOR_CLOUD?.profile)?'block':'none','important');return out;};}
+ const prevTab=window.riviorCloudTab;
+ if(typeof prevTab==='function'&&!window.__riviorGradeGateWrapped){window.__riviorGradeGateWrapped=true;window.riviorCloudTab=async function(tab='grades'){const user=window.RIVIOR_CLOUD?.user;const profile=window.RIVIOR_CLOUD?.profile;if(tab==='grades'&&profile?.role==='student'&&!verified(user)){const hub=$('ch-content');if(hub)hub.innerHTML='<div class="ch-card"><h3>🔒 Notas temporariamente bloqueadas</h3><p>Confirma o teu email para consultar notas e médias. O resto das áreas de aprendizagem continua disponível.</p><p>Abre a mensagem de confirmação enviada para <b>'+String(user?.email||'o teu email').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))+'</b> e carrega no botão de confirmação. Depois termina sessão e entra novamente.</p><button onclick="riviorCloudLogout()">Sair e voltar a entrar</button></div>';return;}return prevTab(tab);};}
+ if(window.supabase&&window.supabase.createClient){try{const c=client()||window.supabase.createClient('https://nbymepgoztensexxubvj.supabase.co','sb_publishable_xaSDr3kW1PTDXDQ6z71pLw_KFXZCSDJ',{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});c.auth.getSession().then(({data})=>{if(data?.session){banner(data.session.user);const launch=$('rivior-ai-launch');if(launch&&window.RIVIOR_CLOUD?.profile)launch.style.setProperty('display','block','important');}});c.auth.onAuthStateChange((_e,session)=>{const launch=$('rivior-ai-launch');if(launch)launch.style.setProperty('display',(session&&window.RIVIOR_CLOUD?.profile)?'block':'none','important');if(session)banner(session.user);else{$('rivior-email-verification-banner')?.remove();}});}catch(e){console.warn('Rivior auth init',e);}}
+})();
+</script>
 </body>
 </html>
