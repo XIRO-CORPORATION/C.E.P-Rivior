@@ -5543,7 +5543,7 @@ window.riviorCloudOpen=(tab='grades')=>{showHub();if(!configured()){ $('ch-statu
 window.riviorCloudTab=async(tab)=>{if(!sb||!cloudUser){window.riviorCloudOpen(tab);return;}const c=$('ch-content');c.innerHTML='<div class="ch-card">A carregar dados reais do Supabase…</div>';document.querySelectorAll('#cloud-hub .ch-tabs button').forEach(b=>b.classList.toggle('on',b.dataset.t===tab));if(tab==='management'){await renderTeacherAssignments(c);if(cloudProfile?.role==='manager')await renderGuardianRequests();}else if(tab==='students')await renderStudents(c);else if(tab==='directory')await renderStudentDirectory(c);else if(tab==='behavior')await renderBehavior(c);else if(tab==='attendance')await renderAttendance(c);else if(tab==='grades')await renderGrades(c);else if(tab==='longatp')await renderLongatp(c);else if(tab==='chat')await renderChat(c);else if(tab==='notices')await renderNotices(c);else await renderProgress(c);};
 async function enterCloud(user){if(!sb||!user)return;if(cloudUser&&cloudProfile&&cloudUser.id===user.id)return;const {data,error}=await sb.from('profiles').select('*').eq('id',user.id).maybeSingle();if(error){console.error('Rivior profile load failed:',error);notify('A autenticação foi iniciada, mas o perfil não pôde ser lido. Verifica as políticas RLS da tabela profiles. Detalhe: '+(error.message||'erro desconhecido'));return;}if(!data){notify('A conta existe no Auth, mas não tem perfil em public.profiles. É necessário corrigir o trigger de criação do perfil.');return;}cloudUser=user;cloudProfile=data;await riviorLoadActiveAcademicYear();window.RIVIOR_CLOUD={client:sb,user,profile:data};
   // Existing learning screens are reused, but all academic records and messaging are handled by cloud tables.
-  if(data.role==='teacher'){getStore().perfil={nome:data.full_name,role:'teacher'};persist();openTeacherPanel();}else if(data.role==='manager'){getStore().perfil={nome:data.full_name,role:'manager'};persist();}else if(data.role==='guardian'){getStore().perfil={nome:data.full_name,role:'guardian'};persist();openCloudGuardianDashboard();return;}else{getStore().perfil={nome:data.full_name,classe:String(data.class_level||'8'),turma:data.class_group||'',role:'student',username:user.email,studentId:user.id};persist();openDash();}
+  if(data.role==='teacher'){getStore().perfil={nome:data.full_name,role:'teacher'};persist();openTeacherPanel();}else if(data.role==='manager'){getStore().perfil={nome:data.full_name,role:'manager'};persist();hide('view-login');}else if(data.role==='guardian'){getStore().perfil={nome:data.full_name,role:'guardian'};persist();openCloudGuardianDashboard();return;}else{getStore().perfil={nome:data.full_name,classe:String(data.class_level||'8'),turma:data.class_group||'',role:'student',username:user.email,studentId:user.id};persist();openDash();}
   addCloudEntryPoints();const isT=data.role==='teacher',isM=data.role==='manager';if(isT){['view-login','view-dash','view-teacher','view-tema','view-licao','view-quiz','view-exp'].forEach(id=>{if($(id))$(id).classList.add('hidden');});}if($('ch-tab-students'))$('ch-tab-students').style.display=(isT||isM)?'':'none';if($('ch-tab-directory'))$('ch-tab-directory').style.display=(isT||isM)?'':'none';if($('ch-tab-behavior'))$('ch-tab-behavior').style.display=(isT||isM)?'':'none';if($('ch-tab-attendance'))$('ch-tab-attendance').style.display=(isT||isM)?'':'none';if($('ch-tab-management'))$('ch-tab-management').style.display=isM?'':'none';if($('ch-close'))$('ch-close').style.display=isT?'none':'';$('ch-status').textContent='Ligado ao Supabase · '+(isM?'gestor':isT?'professor':'aluno')+' · '+user.email;if(isM){riviorCloudOpen('management');}else if(isT){riviorCloudOpen('grades');}else{syncCloudAvg();syncLearningProgress();refreshNoticeBadge();}
 }
 // Replaces the old local-only login. No hard-coded teacher password or local-only login is accepted.
@@ -5901,18 +5901,12 @@ window.doLogin=async function(){
       const prof=await client.from('profiles').select('*').eq('id',result.data.user.id).maybeSingle();
       if(prof.error)throw prof.error;
       if(!prof.data){notify('A conta foi criada, mas o perfil escolar não foi criado. Executa o SQL da Etapa 3 e contacta o administrador.');return;}
-      // Login será encaminhado pela mesma sessão persistente; recarregar evita perfil local antigo.
-      location.reload();return;
+      // Não recarregar a página: abrir o painel na sessão atual evita regressar ao login.
+      await enterCloud(result.data.user);return;
     } else {
       result=await client.auth.signInWithPassword({email,password});if(result.error)throw result.error;
       const pr=await client.from('profiles').select('*').eq('id',result.data.user.id).maybeSingle();if(pr.error)throw pr.error;if(!pr.data)throw new Error('Esta conta não tem perfil escolar. Executa o SQL da Etapa 3 ou pede ao administrador para corrigir o perfil.');
-      const role=pr.data.role;
-      if(role==='teacher'||role==='manager'){
-        const cloud=window.RIVIOR_CLOUD||(window.RIVIOR_CLOUD={});cloud.client=client;cloud.user=result.data.user;cloud.profile=pr.data;
-        // Recarregar para que o módulo cloud reconstrua o painel com a sessão já existente.
-        location.reload();return;
-      }
-      location.reload();return;
+      await enterCloud(result.data.user);return;
     }
   }catch(e){notify('Supabase: '+(e.message||'não foi possível concluir a operação.'));}
   finally{if(btn)btn.disabled=false;}
@@ -6427,7 +6421,7 @@ const boot=()=>{init();setTimeout(riviorSignupRoleChanged,100);};if(document.rea
 
 <!-- Assistente IA Rivior: interface integrada com a Edge Function rivior-assistant -->
 <style>
-#rivior-ai-launch{position:fixed;right:16px;bottom:calc(18px + env(safe-area-inset-bottom));z-index:9998;border:0;border-radius:999px;padding:13px 17px;background:linear-gradient(135deg,#7c5cff,#2563eb);color:white;font-weight:800;font-size:14px;box-shadow:0 8px 28px #0008;cursor:pointer}
+#rivior-ai-launch{display:none;position:fixed;right:16px;bottom:calc(18px + env(safe-area-inset-bottom));z-index:9998;border:0;border-radius:999px;padding:13px 17px;background:linear-gradient(135deg,#7c5cff,#2563eb);color:white;font-weight:800;font-size:14px;box-shadow:0 8px 28px #0008;cursor:pointer}
 #rivior-ai-panel{position:fixed;inset:0;z-index:10002;background:rgba(2,6,16,.78);backdrop-filter:blur(7px);display:none;padding:12px;box-sizing:border-box;color:#edf3ff;font-family:inherit}
 #rivior-ai-panel.open{display:flex;align-items:center;justify-content:center}
 #rivior-ai-panel .rai-window{width:min(760px,100%);height:min(850px,96dvh);display:flex;flex-direction:column;background:#091329;border:1px solid #344566;border-radius:18px;overflow:hidden;box-shadow:0 18px 70px #0009}
@@ -6438,7 +6432,7 @@ const boot=()=>{init();setTimeout(riviorSignupRoleChanged,100);};if(document.rea
 #rivior-ai-panel .rai-settings{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:12px 14px;border-bottom:1px solid #243553}
 #rivior-ai-panel label{font-size:12px;opacity:.85}#rivior-ai-panel select{display:block;width:100%;margin-top:5px;padding:10px;border:1px solid #344666;border-radius:10px;background:#071124;color:#fff}
 #rivior-ai-panel .rai-messages{flex:1;overflow:auto;padding:14px;display:flex;flex-direction:column;gap:10px}
-#rivior-ai-panel .rai-msg{max-width:92%;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.5;padding:11px 13px;border-radius:13px;font-size:14px}
+#rivior-ai-panel .rai-msg{max-width:92%;white-space:normal;overflow-wrap:anywhere;line-height:1.65;padding:11px 13px;border-radius:13px;font-size:14px}#rivior-ai-panel .rai-msg p{margin:5px 0 10px}#rivior-ai-panel .rai-msg h1,#rivior-ai-panel .rai-msg h2,#rivior-ai-panel .rai-msg h3{margin:12px 0 6px;font-size:1.05em}#rivior-ai-panel .rai-msg ul,#rivior-ai-panel .rai-msg ol{padding-left:22px}#rivior-ai-panel .rai-msg mjx-container{max-width:100%;overflow-x:auto;overflow-y:hidden;color:#fff}#rivior-ai-panel .rai-msg code{white-space:pre-wrap;background:#071124;padding:2px 4px;border-radius:4px}
 #rivior-ai-panel .rai-user{align-self:flex-end;background:#263e70}#rivior-ai-panel .rai-bot{align-self:flex-start;background:#13213a;border:1px solid #2d405f}#rivior-ai-panel .rai-note{font-size:12px;opacity:.7;text-align:center;padding:0 14px 8px}
 #rivior-ai-panel .rai-form{padding:12px;display:flex;gap:8px;border-top:1px solid #243553;background:#0b1730}
 #rivior-ai-panel textarea{flex:1;min-width:0;resize:vertical;min-height:46px;max-height:150px;padding:11px;border:1px solid #344666;border-radius:12px;background:#071124;color:#fff}
@@ -6462,6 +6456,10 @@ const boot=()=>{init();setTimeout(riviorSignupRoleChanged,100);};if(document.rea
  </section>
 </div>
 <script>
+window.MathJax = { tex: { inlineMath: [['$','$'], ['\\(','\\)']], displayMath: [['$$','$$'], ['\\[','\\]']], processEscapes: true }, options: { skipHtmlTags: ['script','noscript','style','textarea','pre','code'] }, startup: { typeset: false } };
+</script>
+<script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
+<script>
 (function(){
  'use strict';
  const URL_BASE='https://nbymepgoztensexxubvj.supabase.co';
@@ -6469,16 +6467,27 @@ const boot=()=>{init();setTimeout(riviorSignupRoleChanged,100);};if(document.rea
  const $=id=>document.getElementById(id);
  const panel=$('rivior-ai-panel'), messages=$('rivior-ai-messages'), form=$('rivior-ai-form'), input=$('rivior-ai-input'), send=$('rivior-ai-send');
  let history=[], accessToken=null, profile=null;
- function addMessage(text,who){const div=document.createElement('div');div.className='rai-msg '+(who==='user'?'rai-user':'rai-bot');div.textContent=text;messages.appendChild(div);messages.scrollTop=messages.scrollHeight;return div;}
- function open(){panel.classList.add('open');document.body.style.overflow='hidden';refreshSession();setTimeout(()=>input.focus(),100);}
+ const authClient=(window.supabase&&window.supabase.createClient)?window.supabase.createClient(URL_BASE,PUBLIC_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}}):null;
+ function escapeHtml(v){return String(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+ function formatAnswer(text){
+  let t=escapeHtml(text).replace(/```[a-zA-Z0-9_-]*\s*([\s\S]*?)```/g,'<pre><code>$1</code></pre>');
+  t=t.replace(/^###\s+(.+)$/gm,'<h3>$1</h3>').replace(/^##\s+(.+)$/gm,'<h2>$1</h2>').replace(/^#\s+(.+)$/gm,'<h2>$1</h2>');
+  t=t.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\*(.+?)\*/g,'<em>$1</em>');
+  t=t.replace(/^\s*[-*]\s+(.+)$/gm,'<li>$1</li>').replace(/(?:<li>[\s\S]*?<\/li>\s*)+/g,m=>'<ul>'+m+'</ul>');
+  t=t.replace(/\n{2,}/g,'</p><p>').replace(/\n/g,'<br>');
+  return '<p>'+t+'</p>';
+ }
+ function addMessage(text,who){const div=document.createElement('div');div.className='rai-msg '+(who==='user'?'rai-user':'rai-bot');if(who==='bot'){div.innerHTML=formatAnswer(text);if(window.MathJax&&MathJax.typesetPromise)MathJax.typesetPromise([div]).catch(()=>{});}else div.textContent=text;messages.appendChild(div);messages.scrollTop=messages.scrollHeight;return div;}
+ function open(){refreshSession().then(()=>{if(!accessToken){addMessage('Para utilizar o Assistente IA, inicia sessão na tua conta do Rivior.','bot');return;}panel.classList.add('open');document.body.style.overflow='hidden';setTimeout(()=>input.focus(),100);});}
  function close(){panel.classList.remove('open');document.body.style.overflow='';}
  async function refreshSession(){
-  try{if(!window.supabase||!window.supabase.createClient)return;const client=window.supabase.createClient(URL_BASE,PUBLIC_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});const {data}=await client.auth.getSession();accessToken=data.session?.access_token||null;
-   if(data.session?.user){const {data:p}=await client.from('profiles').select('role,class_level,class_group,period').eq('id',data.session.user.id).maybeSingle();profile=p||null;
-    if(profile){const role=String(profile.role||'').toLowerCase();$('rivior-ai-mode').value=(role==='teacher'||role==='professor'||role==='professor(a)'||role==='manager')?'professor':'aluno';if(profile.class_level&&!$('rivior-ai-class').value)$('rivior-ai-class').value=profile.class_level+'ª classe';}
-   }
+  try{if(!authClient)return;const {data}=await authClient.auth.getSession();accessToken=data.session?.access_token||null;const launch=$('rivior-ai-launch');if(launch)launch.style.display=accessToken?'block':'none';
+   if(data.session?.user){const {data:p}=await authClient.from('profiles').select('role,class_level,class_group,period').eq('id',data.session.user.id).maybeSingle();profile=p||null;
+    if(profile){const role=String(profile.role||'').toLowerCase();const isTeacher=['teacher','professor','professor(a)','manager'].includes(role);$('rivior-ai-mode').innerHTML=isTeacher?'<option value="professor">Professor — aulas e avaliações</option>':'<option value="aluno">Aluno — aprender e preparar provas</option>';$('rivior-ai-mode').value=isTeacher?'professor':'aluno';$('rivior-ai-mode').disabled=true;$('rivior-ai-mode').closest('label').style.opacity='.85';$('rivior-ai-mode').closest('label').title=isTeacher?'Perfil de professor: assistente pedagógico':'Perfil de aluno: assistente de aprendizagem';if(profile.class_level&&!$('rivior-ai-class').value)$('rivior-ai-class').value=profile.class_level+'ª classe';$('rivior-ai-subject').value=$('rivior-ai-subject').value||'Geral';}
+   }else{profile=null;const launch=$('rivior-ai-launch');if(launch)launch.style.display='none';$('rivior-ai-mode').disabled=true;}
   }catch(e){console.warn('Rivior IA: não foi possível ler a sessão',e);}
  }
+ if(authClient){authClient.auth.onAuthStateChange(()=>{setTimeout(refreshSession,0);});refreshSession();}
  $('rivior-ai-launch').addEventListener('click',open);$('rivior-ai-close').addEventListener('click',close);panel.addEventListener('click',e=>{if(e.target===panel)close();});document.addEventListener('keydown',e=>{if(e.key==='Escape')close();});
  $('rivior-ai-clear').addEventListener('click',()=>{history=[];messages.innerHTML='';addMessage('Nova conversa iniciada. Em que posso ajudar?','bot');});
  $('rivior-ai-lesson').addEventListener('click',()=>{input.value='Prepara um plano de aula completo sobre [indica o tema], com objectivos, pré-requisitos, introdução, desenvolvimento, exemplos, actividades para os alunos, recursos e avaliação final.';input.focus();});
@@ -6492,8 +6501,8 @@ const boot=()=>{init();setTimeout(riviorSignupRoleChanged,100);};if(document.rea
    const response=await fetch(URL_BASE+'/functions/v1/rivior-assistant',{method:'POST',headers:{'Content-Type':'application/json','apikey':PUBLIC_KEY,'Authorization':'Bearer '+accessToken},body:JSON.stringify({message,mode,subject,classLevel,history:history.slice(0,-1)})});
    let data={};try{data=await response.json();}catch(_){}
    if(!response.ok)throw new Error(data.error||('O serviço respondeu com erro '+response.status+'.'));
-   const answer=String(data.answer||'Não recebi uma resposta. Tenta novamente.');waiting.textContent=answer;history.push({role:'model',parts:[{text:answer}]});if(history.length>12)history=history.slice(-12);
-  }catch(err){waiting.textContent='Não consegui obter uma resposta: '+(err.message||'erro de ligação')+'\n\nConfirma que GEMINI_API_KEY está guardada nos Secrets do Supabase e que a tua sessão continua activa.';}
+   const answer=String(data.answer||'Não recebi uma resposta. Tenta novamente.');waiting.innerHTML=formatAnswer(answer);if(window.MathJax&&MathJax.typesetPromise)MathJax.typesetPromise([waiting]).catch(()=>{});history.push({role:'model',parts:[{text:answer}]});if(history.length>12)history=history.slice(-12);
+  }catch(err){waiting.textContent='Não consegui obter uma resposta: '+(err.message||'erro de ligação')+'\n\nO erro pode estar na configuração do serviço Gemini. Se o código for 404, é necessário actualizar o modelo usado pela função no Supabase; não precisas de criar outra chave sem verificar esse erro.';}
   finally{send.disabled=false;send.textContent='Enviar';messages.scrollTop=messages.scrollHeight;input.focus();}
  });
 })();
