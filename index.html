@@ -1071,6 +1071,8 @@ function fmt(n,d){ if(d===undefined) d=2; var v=Math.round(n*Math.pow(10,d))/Mat
 function shuffle(arr){ arr=arr.slice(); for(var i=arr.length-1;i>0;i--){ var j=Math.floor(Math.random()*(i+1)); var t=arr[i]; arr[i]=arr[j]; arr[j]=t; } return arr; }
 function pick(arr,n){ return shuffle(arr).slice(0,n); }
 
+/* Expostos para o bloco cloud (script do Supabase), que os chama pelo nome simples */
+window.hide=hide; window.show=show; window.showBG=showBG;
 /* ============ FUNDOS ============ */
 function showBG(kind){
   if(kind === 'universe'){
@@ -5519,9 +5521,14 @@ const getStore=()=>(window.__APP?window.__APP.getStore():{});const persist=()=>{
 const safe = v => String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const notify = msg => { const e=$('login-err'); if(e)e.textContent=msg; else alert(msg); };
 function configured(){return READY && window.supabase && window.supabase.createClient;}
+/* Estado/funções do bloco cloud lidos (só leitura) pelos scripts das etapas 6-12, que estão fora deste IIFE */
+[['sb',()=>sb],['cloudUser',()=>cloudUser],['cloudProfile',()=>cloudProfile]].forEach(([n,g])=>{try{Object.defineProperty(window,n,{get:g,configurable:true});}catch(e){console.warn('Rivior: não foi possível expor',n,e);}});
+window.safe=safe; window.renderRiviorNotifications=renderRiviorNotifications;
+window.enterCloud=enterCloud; /* o doLogin final (rivior-auth-final-fix) precisa de chamar enterCloud */
 function init(){
   if(!configured()) { console.warn('Supabase ainda não configurado. A autenticação e as funções cloud ficam bloqueadas.'); addCloudEntryPoints(); return; }
   sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
+  window.__RIVIOR_SUPABASE_CLIENT=sb; /* cliente único partilhado com o doLogin final e o portal do encarregado */
   addCloudEntryPoints();
   sb.auth.getSession().then(async ({data,error})=>{if(error)return; if(data.session) await enterCloud(data.session.user);});
   sb.auth.onAuthStateChange((_event,session)=>{if(session && !cloudUser) setTimeout(()=>enterCloud(session.user),0);});
@@ -6530,6 +6537,7 @@ window.MathJax = { tex: { inlineMath: [['$','$'], ['\\(','\\)']], displayMath: [
    const email=String((creating?($('in-email-signup')?.value||''):($('in-username')?.value||''))).trim().toLowerCase();
    const password=String((creating?($('in-password-signup')?.value||''):($('in-password')?.value||'')));
    const btn=document.querySelector('#view-login .btn.gold');
+   say(''); /* limpa a mensagem anterior */
    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){say('Introduz um endereço de email válido, por exemplo nome@gmail.com.');return;}
    if(password.length<6){say('A senha deve ter pelo menos 6 caracteres.');return;}
    const c=client(); if(!c){say('O serviço de acesso está temporariamente indisponível. Verifica a ligação à internet e tenta novamente dentro de instantes.');return;}
@@ -6550,6 +6558,8 @@ window.MathJax = { tex: { inlineMath: [['$','$'], ['\\(','\\)']], displayMath: [
        const r=await c.auth.signUp({email,password,options:{emailRedirectTo:window.location.origin+window.location.pathname,data:metadata}});
        if(r.error)throw r.error;
        if(!r.data.user)throw new Error('O Supabase não devolveu a conta criada. Tenta novamente.');
+       /* Com confirmação de email activa, o Supabase devolve «sucesso» sem identidades quando o email já existe */
+       if(Array.isArray(r.data.user.identities)&&r.data.user.identities.length===0)throw new Error('User already registered');
        if(r.data.session){
          await new Promise(resolve=>setTimeout(resolve,350));
          if(typeof window.enterCloud==='function')await window.enterCloud(r.data.user);
@@ -6560,7 +6570,6 @@ window.MathJax = { tex: { inlineMath: [['$','$'], ['\\(','\\)']], displayMath: [
        }
      }catch(e){
        let m=e?.message||'Erro desconhecido';
-       if(/already registered|already been registered|user already exists/i.test(m))m='Este email já tem uma conta. Usa Entrar ou recupera a senha.';
        if(/already registered|already been registered|user already exists/i.test(m))say('Este e-mail já tem uma conta. Usa Entrar ou recupera a senha.');
        else if(/fetch|network|failed to fetch|timeout|load failed/i.test(m))say('Não foi possível contactar o serviço de registo. Verifica a internet e tenta novamente.');
        else say('Não foi possível concluir o registo. Confirma os dados e tenta novamente. Se o problema continuar, contacta o administrador.');
@@ -6589,7 +6598,9 @@ window.MathJax = { tex: { inlineMath: [['$','$'], ['\\(','\\)']], displayMath: [
  if(typeof prevEnter==='function'&&!window.__riviorEmailGateWrapped){window.__riviorEmailGateWrapped=true;window.enterCloud=async function(user){const out=await prevEnter(user);banner(user);const launch=$('rivior-ai-launch');if(launch)launch.style.setProperty('display',(user&&window.RIVIOR_CLOUD?.profile&&$('view-login')?.classList.contains('hidden'))?'block':'none','important');return out;};}
  const prevTab=window.riviorCloudTab;
  if(typeof prevTab==='function'&&!window.__riviorGradeGateWrapped){window.__riviorGradeGateWrapped=true;window.riviorCloudTab=async function(tab='grades'){const user=window.RIVIOR_CLOUD?.user;const profile=window.RIVIOR_CLOUD?.profile;if(tab==='grades'&&profile?.role==='student'&&!verified(user)){const hub=$('ch-content');if(hub)hub.innerHTML='<div class="ch-card"><h3>🔒 Notas temporariamente bloqueadas</h3><p>Confirma o teu email para consultar notas e médias. O resto das áreas de aprendizagem continua disponível.</p><p>Abre a mensagem de confirmação enviada para <b>'+String(user?.email||'o teu email').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))+'</b> e carrega no botão de confirmação. Depois termina sessão e entra novamente.</p><button onclick="riviorCloudLogout()">Sair e voltar a entrar</button></div>';return;}return prevTab(tab);};}
- if(window.supabase&&window.supabase.createClient){try{const c=client()||window.supabase.createClient('https://nbymepgoztensexxubvj.supabase.co','sb_publishable_xaSDr3kW1PTDXDQ6z71pLw_KFXZCSDJ',{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});c.auth.getSession().then(({data})=>{if(data?.session){banner(data.session.user);const launch=$('rivior-ai-launch');if(launch&&window.RIVIOR_CLOUD?.profile&&$('view-login')?.classList.contains('hidden'))launch.style.setProperty('display','block','important');}});c.auth.onAuthStateChange((_e,session)=>{const launch=$('rivior-ai-launch');if(launch)launch.style.setProperty('display',(session&&window.RIVIOR_CLOUD?.profile&&$('view-login')?.classList.contains('hidden'))?'block':'none','important');if(session)banner(session.user);else{$('rivior-email-verification-banner')?.remove();}});}catch(e){console.warn('Rivior auth init',e);}}
+ const startAuthWatch=()=>{if(window.supabase&&window.supabase.createClient){try{const c=client()||window.supabase.createClient('https://nbymepgoztensexxubvj.supabase.co','sb_publishable_xaSDr3kW1PTDXDQ6z71pLw_KFXZCSDJ',{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});c.auth.getSession().then(({data})=>{if(data?.session){banner(data.session.user);const launch=$('rivior-ai-launch');if(launch&&window.RIVIOR_CLOUD?.profile&&$('view-login')?.classList.contains('hidden'))launch.style.setProperty('display','block','important');}});c.auth.onAuthStateChange((_e,session)=>{const launch=$('rivior-ai-launch');if(launch)launch.style.setProperty('display',(session&&window.RIVIOR_CLOUD?.profile&&$('view-login')?.classList.contains('hidden'))?'block':'none','important');if(session)banner(session.user);else{$('rivior-email-verification-banner')?.remove();}});}catch(e){console.warn('Rivior auth init',e);}}};
+ /* espera pelo boot() do sistema principal, para reutilizar o cliente único em vez de criar outro */
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',startAuthWatch);else startAuthWatch();
 })();
 </script>
 </body>
