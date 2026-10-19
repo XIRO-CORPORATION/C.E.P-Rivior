@@ -5772,7 +5772,7 @@ async function refreshNoticeBadge(){
     const [aq,rq]=await Promise.all([sb.from('announcements').select('id'),sb.from('announcement_reads').select('announcement_id').eq('user_id',cloudUser.id)]);
     if(aq.error)return;const read=new Set((rq.data||[]).map(r=>r.announcement_id));const n=(aq.data||[]).filter(a=>!read.has(a.id)).length;
     const b=$('cloud-notice-btn');if(b)b.textContent='📢 Comunicados'+(n?' ('+n+' novo'+(n>1?'s':'')+')':'');
-    const chip=$('notif-chip');if(chip){if(n){chip.textContent='🔔 '+n;chip.classList.remove('hidden');}else chip.classList.add('hidden');}
+    
   }catch(e){console.warn('Comunicados:',e);}
   if(!noticeTimer)noticeTimer=setInterval(refreshNoticeBadge,60000);
 }
@@ -5820,8 +5820,9 @@ async function renderChat(c){
   window.__chatPeers={peers};
   const classOpts=[7,8,9,10,11,12,13].map(n=>'<option value="'+n+'">'+n+'.ª classe</option>').join('');
   const intro=me.role==='teacher'?'Pesquisa um aluno (7.ª à 13.ª) ou um colega professor pelo nome.':'Pesquisa um professor ou um colega (7.ª à 13.ª) pelo nome.';
-  c.innerHTML=`<div class="ch-grid"><div class="ch-card"><h3>Conversas</h3><p class="ch-muted">${intro}</p><div class="ch-row" style="gap:6px;margin:8px 0"><input id="cc-search" placeholder="Escreve o nome (mín. 2 letras)…" oninput="riviorChatSearchDebounced()" autocomplete="off"><select id="cc-filter" onchange="riviorChatSearch()"><option value="">Todos</option><option value="T">Só professores</option>${classOpts}</select></div><div id="cc-people"></div><div id="cc-blocked"></div></div><div class="ch-card"><div class="ch-row" style="align-items:center;justify-content:space-between;gap:8px"><h3 id="cc-title" style="margin:0">Mensagens</h3><button id="cc-block" style="display:none" onclick="riviorBlockActive()">🚫 Bloquear</button></div><div id="cc-messages" style="min-height:180px;max-height:42vh;overflow:auto"><p class="ch-muted">Abre uma conversa para carregar mensagens.</p></div><label>Mensagem</label><textarea id="cc-text" rows="3" placeholder="Escreve uma mensagem…"></textarea><label>Anexo (imagem, PDF, Word; máximo 10 MB)</label><input id="cc-file" type="file" accept="image/jpeg,image/png,image/webp,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"><button class="ch-primary" onclick="riviorSendMessage()">Enviar mensagem / ficheiro</button><div class="ch-muted" id="cc-upload-status"></div><p class="ch-muted" style="margin-top:12px">🕑 As mensagens e os ficheiros apagam-se automaticamente ao fim de 2 dias.</p></div></div>`;
+  c.innerHTML=`<div class="ch-grid"><div class="ch-card"><h3>Conversas</h3><div id="cc-inbox"><p class="ch-muted">A carregar conversas…</p></div><div class="ch-muted" style="margin:14px 0 2px;font-weight:800">Nova conversa</div><p class="ch-muted">${intro}</p><div class="ch-row" style="gap:6px;margin:8px 0"><input id="cc-search" placeholder="Escreve o nome (mín. 2 letras)…" oninput="riviorChatSearchDebounced()" autocomplete="off"><select id="cc-filter" onchange="riviorChatSearch()"><option value="">Todos</option><option value="T">Professores / ADM</option>${classOpts}</select></div><div id="cc-people"></div><div id="cc-blocked"></div></div><div class="ch-card"><div class="ch-row" style="align-items:center;justify-content:space-between;gap:8px"><h3 id="cc-title" style="margin:0">Mensagens</h3><button id="cc-block" style="display:none" onclick="riviorBlockActive()">🚫 Bloquear</button></div><div id="cc-messages" style="min-height:180px;max-height:42vh;overflow:auto"><p class="ch-muted">Abre uma conversa para carregar mensagens.</p></div><label>Mensagem</label><textarea id="cc-text" rows="3" placeholder="Escreve uma mensagem…"></textarea><label>Anexo (imagem, PDF, Word; máximo 10 MB)</label><input id="cc-file" type="file" accept="image/jpeg,image/png,image/webp,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"><button class="ch-primary" onclick="riviorSendMessage()">Enviar mensagem / ficheiro</button><div class="ch-muted" id="cc-upload-status"></div><p class="ch-muted" style="margin-top:12px">🕑 As mensagens e os ficheiros apagam-se automaticamente ao fim de 2 dias.</p></div></div>`;
   await window.riviorLoadBlocked();
+  window.riviorLoadInbox();
   window.riviorChatSearch();
   riviorPurgeExpiredChat();
 }
@@ -5831,15 +5832,16 @@ window.riviorChatSearch=async function(){
   const box=$('cc-people');if(!box||!sb)return;
   const term=String($('cc-search')?.value||'').trim();
   const f=$('cc-filter')?.value||'';
+  try{rvFilterInbox(term);}catch(_){}
   const peerRow=p=>{
     (window.__peerNames=window.__peerNames||{})[p.id]=p.full_name||'';
-    const isT=p.role==='teacher';
+    const isT=p.role==='teacher',isM=p.role==='manager';
     const sub=(p.subjects||[]).filter(Boolean).join(', ');
-    const meta=isT?('Professor'+(sub?' · '+safe(sub):'')):('Aluno · '+safe(p.class_level||'—')+'.ª'+(p.class_group?' '+safe(p.class_group):'')+(sub?' · '+safe(sub):''));
+    const meta=(isT||isM)?((isM?'Direcção / ADM':'Professor')+(sub?' · '+safe(sub):'')):('Aluno · '+safe(p.class_level||'—')+'.ª'+(p.class_group?' '+safe(p.class_group):'')+(sub?' · '+safe(sub):''));
     return '<button style="display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;text-align:left;margin:5px 0" onclick="riviorStartChat(\''+safe(p.id)+'\')"><span><b>'+(isT?'Prof. ':'')+safe(p.full_name||'Sem nome')+'</b><br><span class="ch-muted">'+meta+'</span></span><span aria-label="Enviar mensagem" style="font-size:20px">➤</span></button>';
   };
   if(term.length<2){
-    const sug=(window.__chatPeers?.peers||[]).filter(p=>!f||(f==='T'?p.role==='teacher':String(p.class_level)===f));
+    const sug=(window.__chatPeers?.peers||[]).filter(p=>!f||(f==='T'?(p.role==='teacher'||p.role==='manager'):String(p.class_level)===f));
     box.innerHTML=sug.length?'<div class="ch-muted" style="margin:6px 0 2px;font-weight:800">Os teus contactos</div>'+sug.map(peerRow).join(''):'<p class="ch-muted">Escreve pelo menos 2 letras do nome para pesquisar professores e colegas.</p>';
     return;
   }
@@ -5850,19 +5852,38 @@ window.riviorChatSearch=async function(){
   if(!r.error){rows=r.data||[];}
   else{
     // Alternativa se o SQL ainda não foi executado: pesquisa directa (depende das permissões da conta).
-    let q=sb.from('profiles').select('id,full_name,role,class_level,class_group').neq('id',cloudUser.id).in('role',['student','teacher']).ilike('full_name','%'+term.replace(/[%_]/g,' ')+'%').limit(30);
-    if(f==='T')q=q.eq('role','teacher');else if(/^\d+$/.test(f))q=q.eq('role','student').eq('class_level',Number(f));
+    let q=sb.from('profiles').select('id,full_name,role,class_level,class_group').neq('id',cloudUser.id).in('role',['student','teacher','manager']).ilike('full_name','%'+term.replace(/[%_]/g,' ')+'%').limit(30);
+    if(f==='T')q=q.in('role',['teacher','manager']);else if(/^\d+$/.test(f))q=q.eq('role','student').eq('class_level',Number(f));
     const r2=await q;
     if(r2.error){errMsg=r2.error.message;}
-    else rows=(r2.data||[]).filter(p=>!(window.__myBlocks&&window.__myBlocks.has(p.id))&&(p.role==='teacher'||(Number(p.class_level)>=7&&Number(p.class_level)<=13)));
+    else rows=(r2.data||[]).filter(p=>!(window.__myBlocks&&window.__myBlocks.has(p.id))&&(p.role==='teacher'||p.role==='manager'||(Number(p.class_level)>=7&&Number(p.class_level)<=13)));
   }
-  if(rows===null){box.innerHTML='<p class="ch-muted">Não foi possível pesquisar: '+safe(errMsg||r.error?.message||'erro')+'. Executa o ficheiro SQL «rivior_chat_pesquisa_e_2dias.sql» no Supabase.</p>';return;}
+  if(rows===null){box.innerHTML='<p class="ch-muted">Não foi possível pesquisar: '+safe(errMsg||r.error?.message||'erro')+'. Executa o ficheiro SQL «01_chat_pesquisa_e_limpeza_2dias.sql» no Supabase.</p>';return;}
   if(!rows.length){box.innerHTML='<p class="ch-muted">Ninguém encontrado com esse nome. A pessoa precisa de ter conta na plataforma.</p>';return;}
-  const profs=rows.filter(p=>p.role==='teacher'),alunos=rows.filter(p=>p.role!=='teacher');
-  box.innerHTML=(profs.length?'<div class="ch-muted" style="margin:6px 0 2px;font-weight:800">Professores</div>'+profs.map(peerRow).join(''):'')+(alunos.length?'<div class="ch-muted" style="margin:10px 0 2px;font-weight:800">Alunos</div>'+alunos.map(peerRow).join(''):'');
+  const profs=rows.filter(p=>p.role==='teacher'||p.role==='manager'),alunos=rows.filter(p=>p.role!=='teacher'&&p.role!=='manager');
+  box.innerHTML=(profs.length?'<div class="ch-muted" style="margin:6px 0 2px;font-weight:800">Professores / Direcção</div>'+profs.map(peerRow).join(''):'')+(alunos.length?'<div class="ch-muted" style="margin:10px 0 2px;font-weight:800">Alunos</div>'+alunos.map(peerRow).join(''):'');
 };
 window.riviorChatFilter=window.riviorChatSearch;
-window.riviorStartChat=async(target)=>{if(await riviorIsBlocked(target))return alert('Não é possível enviar mensagens a esta pessoa.');const {data,error}=await sb.rpc('create_direct_conversation',{target_user:target});if(error){alert('Não foi possível iniciar a conversa: '+error.message);return;}activeConversation=data;window.__activePeer=target;const {data:peer}=await sb.from('profiles').select('full_name').eq('id',target).maybeSingle();const _t=$('cc-title');window.__activePeerName=peer?.full_name||(window.__peerNames||{})[target]||'';if(_t)_t.textContent='Conversa com '+(window.__activePeerName||'utilizador');const _b=$('cc-block');if(_b)_b.style.display='';await loadMessages();try{$('cc-title')?.scrollIntoView({behavior:'smooth',block:'start'});}catch(_){}if(realtimeChannel)sb.removeChannel(realtimeChannel);realtimeChannel=sb.channel('rivior-chat-'+data).on('postgres_changes',{event:'INSERT',schema:'public',table:'chat_messages',filter:'conversation_id=eq.'+data},()=>loadMessages()).on('postgres_changes',{event:'UPDATE',schema:'public',table:'chat_messages',filter:'conversation_id=eq.'+data},()=>loadMessages()).on('postgres_changes',{event:'DELETE',schema:'public',table:'chat_messages'},()=>loadMessages()).subscribe();};
+window.riviorOpenConversation=async function(conv,target,nameHint){
+  if(target&&await riviorIsBlocked(target))return alert('Não é possível enviar mensagens a esta pessoa.');
+  activeConversation=conv;window.__activePeer=target||null;
+  let name=nameHint||(window.__peerNames||{})[target]||(rvPeerMap()[conv]||{}).name||'';
+  if(!name&&target){await rvResolveNames([target]);name=(window.__peerNames||{})[target]||'';}
+  window.__activePeerName=name;
+  if(target)rvRememberPeer(conv,target,name);
+  const t=$('cc-title');if(t)t.textContent='Conversa com '+(name||'utilizador');
+  const bb=$('cc-block');if(bb)bb.style.display=target?'':'none';
+  await loadMessages();
+  try{$('cc-title')?.scrollIntoView({behavior:'smooth',block:'start'});}catch(_){}
+  if(realtimeChannel)sb.removeChannel(realtimeChannel);
+  realtimeChannel=sb.channel('rivior-chat-'+conv).on('postgres_changes',{event:'INSERT',schema:'public',table:'chat_messages',filter:'conversation_id=eq.'+conv},()=>loadMessages()).on('postgres_changes',{event:'UPDATE',schema:'public',table:'chat_messages',filter:'conversation_id=eq.'+conv},()=>loadMessages()).on('postgres_changes',{event:'DELETE',schema:'public',table:'chat_messages'},()=>loadMessages()).subscribe();
+};
+window.riviorStartChat=async(target)=>{
+  if(await riviorIsBlocked(target))return alert('Não é possível enviar mensagens a esta pessoa.');
+  const {data,error}=await sb.rpc('create_direct_conversation',{target_user:target});
+  if(error){alert('Não foi possível iniciar a conversa: '+error.message);return;}
+  return window.riviorOpenConversation(data,target,'');
+};
 const BIG_FILE_BYTES=4*1024*1024;
 const CHAT_TTL_DAYS=2;
 function chatTtlDays(){return CHAT_TTL_DAYS;}
@@ -5908,6 +5929,9 @@ async function loadMessages(){
     return '<div class="ch-msg '+(mine?'mine':'')+'">'+safe(m.body||'')+att+'<div class="ch-muted">'+new Date(m.created_at).toLocaleString('pt-PT')+' · '+expiryLabel(m.created_at)+(manage?' · <a href="#" style="color:inherit" onclick="riviorDeleteMessage(\''+m.id+'\');return false">apagar mensagem</a>':'')+'</div></div>';
   }).join('')||'<p class="ch-muted">Ainda não há mensagens. Escreve a primeira.</p>';
   box.scrollTop=box.scrollHeight;
+  if(data.length)riviorMarkRead(activeConversation,data[data.length-1].created_at);
+  if($('cc-inbox'))window.riviorLoadInbox();
+  window.riviorRefreshBadges&&window.riviorRefreshBadges();
 }
 window.riviorDeleteAttachment=async(id)=>{
   if(!confirm('Apagar só o ficheiro? A mensagem de texto fica.'))return;
@@ -5941,7 +5965,7 @@ window.riviorLoadBlocked=async function(){
   const q=await sb.from('chat_blocks').select('blocked_id,blocked_name,created_at').eq('blocker_id',cloudUser.id).order('created_at',{ascending:false});
   if(q.error){window.__myBlocks=new Set();if(box)box.innerHTML='';return;}
   const rows=q.data||[];
-  window.__myBlocks=new Set(rows.map(b=>b.blocked_id));
+  window.__myBlocks=new Set(rows.map(b=>b.blocked_id));window.__blocksLoaded=true;
   if(box)box.innerHTML=rows.length?'<div class="ch-muted" style="margin:12px 0 2px;font-weight:800">Bloqueados</div>'+rows.map(b=>'<div class="ch-row" style="align-items:center;justify-content:space-between;margin:4px 0"><span>'+safe(b.blocked_name||'Utilizador')+'</span><button onclick="riviorUnblock(\''+safe(b.blocked_id)+'\')">Desbloquear</button></div>').join(''):'';
 };
 window.riviorBlockActive=async function(){
@@ -5949,7 +5973,7 @@ window.riviorBlockActive=async function(){
   const nome=window.__activePeerName||'esta pessoa';
   if(!confirm('Bloquear '+nome+'? Não poderão trocar mensagens e deixam de aparecer um ao outro na pesquisa. Podes desbloquear depois.'))return;
   const r=await sb.from('chat_blocks').upsert({blocker_id:cloudUser.id,blocked_id:id,blocked_name:nome},{onConflict:'blocker_id,blocked_id'});
-  if(r.error)return alert('Não foi possível bloquear: '+r.error.message+'\nExecuta o ficheiro SQL «rivior_chat_bloqueio.sql» no Supabase.');
+  if(r.error)return alert('Não foi possível bloquear: '+r.error.message+'\nExecuta o ficheiro SQL «02_chat_bloqueio_e_pesquisa.sql» no Supabase.');
   activeConversation=null;window.__activePeer=null;
   try{if(realtimeChannel){sb.removeChannel(realtimeChannel);realtimeChannel=null;}}catch(_){}
   const m=$('cc-messages');if(m)m.innerHTML='<p class="ch-muted">Pessoa bloqueada.</p>';
@@ -5969,6 +5993,7 @@ window.riviorUnblock=async function(id){
     return _send.apply(this,arguments);
   };
 })();
+
 /* ===== ETAPA 13 — ASSIDUIDADE E FALTAS ===== */
 async function renderAttendance(c){
   if(!cloudProfile||!['teacher','manager'].includes(cloudProfile.role)){c.innerHTML='<div class="ch-card">Sem permissão para consultar a assiduidade.</div>';return;}
@@ -6083,20 +6108,153 @@ window.riviorAdminDeleteGrade=async function(id){if(!cloudProfile||cloudProfile.
 
 /* ===== ETAPA 4 — LONGATP IA (chave sempre no servidor) ===== */
 const LONGATP_HISTORY=[];
+let LONGATP_CONV=null;
+let LONGATP_SAVE_OK=true;
+let longatpTimer=null;
+const LONGATP_DAYS=10,LONGATP_MAX=10;
+function longatpCutoff(){return new Date(Date.now()-LONGATP_DAYS*86400000).toISOString();}
+function lqKey(){return 'rv_ai_q_'+(cloudUser&&cloudUser.id);}
+function longatpFmtDur(ms){const m=Math.max(1,Math.ceil(ms/60000)),h=Math.floor(m/60),r=m%60;return h?h+' h '+(r?r+' min':''):r+' min';}
+async function longatpQuota(){
+  try{
+    const r=await sb.rpc('longatp_quota_status');
+    if(!r.error&&r.data){const d=Array.isArray(r.data)?r.data[0]:r.data;if(d)return {used:d.used,max:d.max_allowed,resetAt:d.reset_at};}
+  }catch(_){}
+  const now=Date.now(),arr=rvLoadJson(lqKey(),[]).filter(t=>now-t<86400000);
+  return {used:arr.length,max:LONGATP_MAX,resetAt:arr.length?new Date(arr[0]+86400000).toISOString():null};
+}
+async function longatpConsume(){
+  try{
+    const r=await sb.rpc('longatp_consume_quota');
+    if(!r.error&&r.data){const d=Array.isArray(r.data)?r.data[0]:r.data;if(d)return {ok:!!d.ok,used:d.used,max:d.max_allowed,resetAt:d.reset_at,id:d.log_id,server:true};}
+  }catch(_){}
+  const now=Date.now(),arr=rvLoadJson(lqKey(),[]).filter(t=>now-t<86400000);
+  if(arr.length>=LONGATP_MAX)return {ok:false,used:arr.length,max:LONGATP_MAX,resetAt:new Date(arr[0]+86400000).toISOString(),server:false};
+  arr.push(now);rvSaveJson(lqKey(),arr);
+  return {ok:true,used:arr.length,max:LONGATP_MAX,resetAt:new Date(arr[0]+86400000).toISOString(),server:false,t:now};
+}
+async function longatpRefund(q){
+  try{
+    if(q&&q.server&&q.id)await sb.rpc('longatp_refund_quota',{p_id:q.id});
+    else if(q&&q.t){rvSaveJson(lqKey(),rvLoadJson(lqKey(),[]).filter(t=>t!==q.t));}
+  }catch(_){}
+}
+function longatpShowQuota(q){
+  const el=$('longatp-quota'),btn=$('longatp-send'),inp=$('longatp-input');if(!el)return;
+  const left=Math.max(0,q.max-q.used);
+  if(left<=0){
+    const ms=q.resetAt?new Date(q.resetAt)-Date.now():0;
+    const hora=q.resetAt?new Date(q.resetAt).toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit'}):'';
+    el.textContent='⛔ Já usaste as '+q.max+' perguntas. Podes voltar a perguntar daqui a '+longatpFmtDur(ms)+(hora?' (às '+hora+')':'')+'. Abrir uma nova conversa não repõe o limite.';
+    if(btn)btn.disabled=true;if(inp)inp.disabled=true;
+  }else{
+    el.textContent='Perguntas disponíveis: '+left+' de '+q.max+' (em 24 h).';
+    if(btn)btn.disabled=false;if(inp)inp.disabled=false;
+  }
+}
+async function longatpRefreshQuota(){const q=await longatpQuota();longatpShowQuota(q);return q;}
+async function longatpCopy(text,btn){
+  try{await navigator.clipboard.writeText(text);}
+  catch(_){const ta=document.createElement('textarea');ta.value=text;ta.style.cssText='position:fixed;opacity:0;top:0;left:0';document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(__){}ta.remove();}
+  if(btn){const o=btn.dataset.o||btn.textContent;btn.dataset.o=o;btn.textContent='✅ Copiado';setTimeout(()=>{btn.textContent=o;},1500);}
+}
+function longatpTranscript(){return LONGATP_HISTORY.map(m=>(m.role==='user'?'Eu: ':'LonGPT: ')+m.content).join('\n\n');}
+window.riviorLongatpCopyAll=function(btn){if(!LONGATP_HISTORY.length)return alert('Ainda não há conversa para copiar.');longatpCopy(longatpTranscript(),btn);};
+window.riviorLongatpDownload=function(){
+  if(!LONGATP_HISTORY.length)return alert('Ainda não há conversa para guardar.');
+  const blob=new Blob([longatpTranscript()],{type:'text/plain;charset=utf-8'}),a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);a.download='LonGPT-'+new Date().toISOString().slice(0,10)+'.txt';document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},500);
+};
+function longatpWho(){
+  const full=String((cloudProfile&&cloudProfile.full_name)||'').trim();
+  const first=full.split(/\s+/)[0]||'';
+  const role=cloudProfile&&cloudProfile.role;
+  const papel=role==='teacher'?'professor':role==='manager'?'administrador da escola (direcção)':role==='guardian'?'encarregado de educação':'aluno';
+  const classe=(role==='student'&&cloudProfile.class_level)?', da '+cloudProfile.class_level+'.ª classe'+(cloudProfile.class_group?' (turma '+cloudProfile.class_group+')':''):'';
+  const treat=first?(role==='teacher'?'Prof. '+first:first):'';
+  const ctx=full?'[Contexto interno, não repetir ao utilizador: chama-se '+full+', é '+papel+classe+'. Trata-o sempre pelo nome ('+treat+'); nunca uses «caro estudante», «caro aluno» ou «caro professor».]\n':'';
+  return {full,first,treat,papel,ctx};
+}
 async function renderLongatp(c){
  if(!cloudUser||!cloudProfile){c.innerHTML='<div class="ch-card"><h3>LonGPT</h3><p>Entra na tua conta Rivior para usar o assistente educativo.</p></div>';return;}
- c.innerHTML=`<div class="ch-card"><div class="ch-row" style="align-items:center"><div style="font-size:38px">🤖</div><div><div style="font-size:11px;letter-spacing:1.5px;color:#ffd166;font-weight:900">ASSISTENTE EDUCATIVO</div><h3 style="margin:2px 0">LonGPT</h3><div class="ch-muted">Explicações, exercícios guiados e preparação para testes.</div></div></div><div class="ch-muted" style="margin:12px 0">LonGPT pode cometer erros. Confirma respostas importantes com o professor. Não introduzas palavras-passe, dados pessoais sensíveis ou informações privadas de outros alunos.</div><div id="longatp-thread" style="min-height:150px;max-height:48vh;overflow:auto;padding:8px;border:1px solid #263653;border-radius:12px;margin:10px 0"><div class="ch-msg">Olá! Sou o LonGPT. Diz-me a disciplina, a classe e o que queres compreender. Posso explicar passo a passo e propor exercícios.</div></div><label for="longatp-subject">Disciplina (opcional)</label><input id="longatp-subject" maxlength="80" placeholder="Ex.: Física"><label for="longatp-class">Classe (opcional)</label><select id="longatp-class"><option value="">Escolher classe</option><option>7.ª classe</option><option>8.ª classe</option><option>9.ª classe</option><option>10.ª classe</option><option>11.ª classe</option><option>12.ª classe</option><option>13.ª classe</option></select><label for="longatp-input">A tua pergunta</label><textarea id="longatp-input" maxlength="4000" rows="4" placeholder="Escreve aqui a tua dúvida…"></textarea><div class="ch-row"><button class="ch-primary" id="longatp-send" onclick="riviorLongatpSend()">Enviar pergunta</button><button onclick="riviorLongatpClear()">Nova conversa</button></div><div id="longatp-status" class="ch-muted" style="margin-top:8px">Limite inicial: 10 perguntas por utilizador/dia. A função de servidor tem de estar publicada e configurada.</div></div>`;
- const thread=$('longatp-thread');LONGATP_HISTORY.forEach(m=>appendLongatpMessage(m.role,m.content));
+ LONGATP_HISTORY.length=0;LONGATP_CONV=null;
+ if(!document.getElementById('longatp-css')){const st=document.createElement('style');st.id='longatp-css';st.textContent='#longatp-thread,#longatp-thread *{-webkit-user-select:text;user-select:text}.lg-copy{margin-top:6px;font-size:12px;padding:4px 10px}.lg-saved-row{display:flex;align-items:center;gap:8px;margin:6px 0;padding:8px 10px;border:1px solid #263653;border-radius:12px}.lg-saved-row .mid{flex:1;min-width:0}.lg-saved-row .mid b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}';document.head.appendChild(st);}
+ c.innerHTML=`<div class="ch-card"><div class="ch-row" style="align-items:center"><div style="font-size:38px">🤖</div><div><div style="font-size:11px;letter-spacing:1.5px;color:#ffd166;font-weight:900">ASSISTENTE EDUCATIVO</div><h3 style="margin:2px 0">LonGPT</h3><div class="ch-muted">Explicações, exercícios guiados e preparação para testes.</div></div></div><div class="ch-muted" style="margin:12px 0">LonGPT pode cometer erros. Confirma respostas importantes com o professor. Não introduzas palavras-passe, dados pessoais sensíveis ou informações privadas de outros alunos.</div><div class="ch-row" style="gap:8px;margin-bottom:8px"><button onclick="riviorLongatpClear()">➕ Nova conversa</button><button onclick="riviorLongatpToggleSaved()">🗂 Guardadas <span id="longatp-saved-count"></span></button></div><div id="longatp-saved" style="display:none;margin-bottom:8px"></div><div id="longatp-thread" style="min-height:150px;max-height:48vh;overflow:auto;padding:8px;border:1px solid #263653;border-radius:12px;margin:10px 0"><div class="ch-msg">Olá${(()=>{const w=longatpWho();return w.treat?', '+safe(w.treat):'';})()}! Sou o LonGPT. Diz-me a disciplina, a classe e o que queres compreender. Posso explicar passo a passo e propor exercícios.</div></div><div class="ch-row" style="gap:8px;margin-bottom:6px"><button onclick="riviorLongatpCopyAll(this)">📋 Copiar conversa</button><button onclick="riviorLongatpDownload()">⬇ Guardar em texto</button></div><label for="longatp-subject">Disciplina (opcional)</label><input id="longatp-subject" maxlength="80" placeholder="Ex.: Física"><label for="longatp-class">Classe (opcional)</label><select id="longatp-class"><option value="">Escolher classe</option><option>7.ª classe</option><option>8.ª classe</option><option>9.ª classe</option><option>10.ª classe</option><option>11.ª classe</option><option>12.ª classe</option><option>13.ª classe</option></select><label for="longatp-input">A tua pergunta</label><textarea id="longatp-input" maxlength="4000" rows="4" placeholder="Escreve aqui a tua dúvida…"></textarea><div class="ch-row"><button class="ch-primary" id="longatp-send" onclick="riviorLongatpSend()">Enviar pergunta</button></div><div id="longatp-quota" class="ch-muted" style="margin-top:8px;font-weight:700">A verificar limite…</div><div id="longatp-status" class="ch-muted" style="margin-top:4px"></div><div class="ch-muted" style="margin-top:12px;padding:10px;border:1px dashed #3a4d73;border-radius:12px">🕑 As tuas conversas com o LonGPT ficam guardadas em «Guardadas» durante <b>${LONGATP_DAYS} dias</b> e depois são apagadas automaticamente. Se quiseres ficar com alguma resposta, usa «📋 Copiar», «⬇ Guardar em texto» ou tira uma captura de ecrã. Limite: ${LONGATP_MAX} perguntas por 24 h; ao atingir o limite, só podes voltar a perguntar quando as 24 h terminarem, mesmo abrindo uma nova conversa.</div></div>`;
+ longatpRefreshQuota();
+ clearInterval(longatpTimer);longatpTimer=setInterval(()=>{if(!$('longatp-quota')){clearInterval(longatpTimer);return;}longatpRefreshQuota();},30000);
+ longatpPurgeExpired().then(()=>longatpLoadSaved());
 }
-function appendLongatpMessage(role,content){const t=$('longatp-thread');if(!t)return;const d=document.createElement('div');d.className='ch-msg'+(role==='user'?' mine':'');d.style.whiteSpace='pre-wrap';d.textContent=String(content||'');t.appendChild(d);t.scrollTop=t.scrollHeight;}
-window.riviorLongatpClear=function(){LONGATP_HISTORY.length=0;const t=$('longatp-thread');if(t)t.innerHTML='<div class="ch-msg">Nova conversa iniciada. Qual é a tua dúvida?</div>';};
+function appendLongatpMessage(role,content){
+  const t=$('longatp-thread');if(!t)return;
+  const d=document.createElement('div');d.className='ch-msg'+(role==='user'?' mine':'');
+  const sp=document.createElement('div');sp.style.whiteSpace='pre-wrap';sp.textContent=String(content||'');d.appendChild(sp);
+  if(role!=='user'){const b=document.createElement('button');b.className='lg-copy';b.textContent='📋 Copiar';b.onclick=()=>longatpCopy(String(content||''),b);d.appendChild(b);}
+  t.appendChild(d);t.scrollTop=t.scrollHeight;
+}
+async function longatpPurgeExpired(){try{await sb.from('longatp_conversations').delete().lt('updated_at',longatpCutoff());}catch(_){}}
+async function longatpLoadSaved(){
+  const box=$('longatp-saved'),cnt=$('longatp-saved-count');if(!box||!sb||!cloudUser)return;
+  const q=await sb.from('longatp_conversations').select('id,title,updated_at').gte('updated_at',longatpCutoff()).order('updated_at',{ascending:false}).limit(50);
+  if(q.error){LONGATP_SAVE_OK=false;if(cnt)cnt.textContent='';box.innerHTML='<p class="ch-muted">As conversas ainda não estão a ser guardadas. Executa o ficheiro SQL «03_longatp_conversas_e_limite.sql» no Supabase.</p>';const st=$('longatp-status');if(st)st.textContent='⚠️ Esta conversa não será guardada.';return;}
+  LONGATP_SAVE_OK=true;const rows=q.data||[];
+  if(cnt)cnt.textContent=rows.length?'('+rows.length+')':'';
+  box.innerHTML=rows.length?rows.map(r=>{
+    const left=Math.max(1,Math.ceil((new Date(r.updated_at).getTime()+LONGATP_DAYS*86400000-Date.now())/86400000));
+    return '<div class="lg-saved-row"><div class="mid"><b>'+safe(r.title||'Conversa')+'</b><span class="ch-muted">'+new Date(r.updated_at).toLocaleString('pt-PT',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})+' · apaga-se em '+left+' d</span></div><button onclick="riviorLongatpOpen(\''+safe(r.id)+'\')">Abrir</button><button title="Apagar" onclick="riviorLongatpDelete(\''+safe(r.id)+'\')">🗑</button></div>';
+  }).join(''):'<p class="ch-muted">Ainda não tens conversas guardadas. As próximas ficam aqui durante '+LONGATP_DAYS+' dias.</p>';
+}
+window.riviorLongatpToggleSaved=function(){const b=$('longatp-saved');if(!b)return;const show=b.style.display==='none';b.style.display=show?'':'none';if(show)longatpLoadSaved();};
+window.riviorLongatpOpen=async function(id){
+  const q=await sb.from('longatp_messages').select('role,content,created_at').eq('conversation_id',id).order('created_at').order('role',{ascending:false});
+  if(q.error)return alert('Não foi possível abrir: '+q.error.message);
+  const t=$('longatp-thread');if(!t)return;t.innerHTML='';LONGATP_HISTORY.length=0;LONGATP_CONV=id;
+  (q.data||[]).forEach(m=>{LONGATP_HISTORY.push({role:m.role,content:m.content});appendLongatpMessage(m.role,m.content);});
+  if(LONGATP_HISTORY.length>16)LONGATP_HISTORY.splice(0,LONGATP_HISTORY.length-16);
+  const sv=$('longatp-saved');if(sv)sv.style.display='none';
+  const st=$('longatp-status');if(st)st.textContent='Conversa guardada aberta. Podes continuar a perguntar.';
+  try{t.scrollIntoView({behavior:'smooth',block:'start'});}catch(_){}
+};
+window.riviorLongatpDelete=async function(id){
+  if(!confirm('Apagar esta conversa guardada?'))return;
+  const r=await sb.from('longatp_conversations').delete().eq('id',id);
+  if(r.error)return alert('Não foi possível apagar: '+r.error.message);
+  if(LONGATP_CONV===id)window.riviorLongatpClear();
+  longatpLoadSaved();
+};
+window.riviorLongatpClear=function(){
+  LONGATP_HISTORY.length=0;LONGATP_CONV=null;
+  const t=$('longatp-thread');if(t){const w=longatpWho();t.innerHTML='<div class="ch-msg">Nova conversa iniciada'+(w.treat?', '+safe(w.treat):'')+'. A anterior ficou em «Guardadas». Qual é a tua dúvida?</div>';}
+  const st=$('longatp-status');if(st)st.textContent='';
+  longatpLoadSaved();
+};
+async function longatpPersist(shownText,answer,tSend){
+  if(!LONGATP_SAVE_OK)return false;
+  try{
+    if(!LONGATP_CONV){
+      const title=shownText.replace(/\s+/g,' ').slice(0,60)||'Conversa';
+      const r=await sb.from('longatp_conversations').insert({title}).select('id').single();
+      if(r.error)throw r.error;LONGATP_CONV=r.data.id;
+    }
+    const ins=await sb.from('longatp_messages').insert([{conversation_id:LONGATP_CONV,role:'user',content:shownText,created_at:new Date(tSend).toISOString()},{conversation_id:LONGATP_CONV,role:'assistant',content:answer,created_at:new Date(Math.max(Date.now(),tSend+1)).toISOString()}]);
+    if(ins.error)throw ins.error;
+    await sb.from('longatp_conversations').update({updated_at:new Date().toISOString()}).eq('id',LONGATP_CONV);
+    longatpLoadSaved();
+    return true;
+  }catch(e){console.warn('LonGPT: conversa não guardada',e);LONGATP_SAVE_OK=false;return false;}
+}
 window.riviorLongatpSend=async function(){
  const input=$('longatp-input'),btn=$('longatp-send'),status=$('longatp-status');if(!sb||!cloudUser)return alert('Inicia sessão no Rivior antes de usar o LonGPT.');const message=(input?.value||'').trim();if(!message)return;if(message.length>4000)return alert('A pergunta é demasiado longa.');
  const subject=$('longatp-subject')?.value.trim()||'geral',grade=$('longatp-class')?.value||'não indicada';const userText=(subject!=='geral'?'Disciplina: '+subject+'. ':'')+(grade!=='não indicada'?'Classe: '+grade+'. ':'')+message;
- btn.disabled=true;status.textContent='LonGPT está a preparar a explicação…';appendLongatpMessage('user',message);input.value='';
- try{const history=LONGATP_HISTORY.slice(-8).map(x=>({role:x.role,content:x.content}));const {data,error}=await sb.functions.invoke('longatp-chat',{body:{message:userText,history}});if(error)throw error;const answer=String(data?.answer||'').trim();if(!answer)throw new Error('O serviço LonGPT devolveu uma resposta vazia.');LONGATP_HISTORY.push({role:'user',content:userText},{role:'assistant',content:answer});if(LONGATP_HISTORY.length>16)LONGATP_HISTORY.splice(0,LONGATP_HISTORY.length-16);appendLongatpMessage('assistant',answer);status.textContent='Resposta recebida. Podes fazer outra pergunta.';
- }catch(e){appendLongatpMessage('assistant','Ainda não consegui responder. Verifica se a função Supabase Edge Function “longatp-chat” foi publicada, se os segredos foram configurados e se tens quota disponível.');status.textContent='Falha no serviço: '+String(e?.message||e).slice(0,220);}
- finally{btn.disabled=false;}
+ btn.disabled=true;status.textContent='A verificar o teu limite…';
+ const quota=await longatpConsume();
+ if(!quota.ok){longatpShowQuota(quota);status.textContent='';return alert('Atingiste o limite de '+quota.max+' perguntas. Podes voltar a perguntar quando as 24 h terminarem.');}
+ longatpShowQuota(quota);btn.disabled=true;
+ status.textContent='LonGPT está a preparar a explicação…';appendLongatpMessage('user',message);input.value='';const tSend=Date.now();let ok=false;
+ try{const history=LONGATP_HISTORY.slice(-8).map(x=>({role:x.role,content:x.content}));const {data,error}=await sb.functions.invoke('longatp-chat',{body:{message:longatpWho().ctx+userText,history,profile:{name:longatpWho().full,first_name:longatpWho().first,role:cloudProfile&&cloudProfile.role,class_level:cloudProfile&&cloudProfile.class_level,class_group:cloudProfile&&cloudProfile.class_group}}});if(error)throw error;const answer=String(data?.answer||'').trim();if(!answer)throw new Error('O serviço LonGPT devolveu uma resposta vazia.');LONGATP_HISTORY.push({role:'user',content:userText},{role:'assistant',content:answer});if(LONGATP_HISTORY.length>16)LONGATP_HISTORY.splice(0,LONGATP_HISTORY.length-16);appendLongatpMessage('assistant',answer);ok=true;
+  const saved=await longatpPersist(message,answer,tSend);
+  status.textContent=saved?'Resposta recebida e guardada durante '+LONGATP_DAYS+' dias.':'Resposta recebida. ⚠️ Esta conversa não ficou guardada (falta executar o SQL do LonGPT).';
+ }catch(e){await longatpRefund(quota);appendLongatpMessage('assistant','Ainda não consegui responder. Esta tentativa não foi contada no teu limite. Verifica se a função Supabase Edge Function “longatp-chat” foi publicada e se os segredos foram configurados.');status.textContent='Falha no serviço: '+String(e?.message||e).slice(0,220);}
+ finally{await longatpRefreshQuota();}
 };
 
 // Mostrar/esconder campos adequados assim que o formulário de cadastro é aberto.
@@ -6358,6 +6516,180 @@ window.riviorCloudTab=async function(tab='grades'){
 
 // Avoid running the legacy local-only login if this module hasn't connected.
 const boot=()=>{init();setTimeout(riviorSignupRoleChanged,100);};if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
+/* ===== CAIXA DE CONVERSAS + CONTADORES DE ALERTA ===== */
+(function(){
+  const css=document.createElement('style');
+  css.textContent='.rv-badge{position:absolute;top:-7px;right:-5px;min-width:20px;height:20px;padding:0 6px;border-radius:10px;background:#ff3b3b;color:#fff;font:900 11px/20px system-ui,sans-serif;text-align:center;box-shadow:0 0 0 2px #0b1220;pointer-events:none;animation:rvpop .35s ease;z-index:3}@keyframes rvpop{0%{transform:scale(.4)}70%{transform:scale(1.25)}100%{transform:scale(1)}}#cloud-hub .ch-tabs button,.quick-action,#cloud-notice-btn{position:relative;overflow:visible}#cloud-hub .ch-tabs{padding-top:9px}.rv-inbox-row{display:flex;align-items:center;gap:10px;width:100%;text-align:left;margin:5px 0;padding:10px 12px}.rv-av{flex:none;width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:900;background:rgba(255,209,102,.18);color:#ffd166}.rv-mid{flex:1;min-width:0}.rv-mid b,.rv-mid span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.rv-mid span{font-size:12px;opacity:.75}.rv-time{flex:none;text-align:right;font-size:11px;opacity:.7}.rv-unread{display:inline-block;margin-top:4px;min-width:20px;height:20px;padding:0 6px;border-radius:10px;background:#ff3b3b;color:#fff;font-weight:900;font-size:11px;line-height:20px;text-align:center}.rv-chip{padding:8px 12px;border-radius:999px;border:1px solid rgba(255,92,92,.5);background:rgba(255,92,92,.14);color:#ffd0d0;font-weight:800}';
+  document.head.appendChild(css);
+})();
+function rvLoadJson(k,d){try{const v=JSON.parse(localStorage.getItem(k)||'null');return v==null?d:v;}catch(_){return d;}}
+function rvSaveJson(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(_){}}
+function rvLrKey(){return 'rv_lr_'+(cloudUser&&cloudUser.id);}
+function rvPeerKey(){return 'rv_peers_'+(cloudUser&&cloudUser.id);}
+function rvPeerMap(){return rvLoadJson(rvPeerKey(),{});}
+function rvRememberPeer(conv,id,name){const m=rvPeerMap();m[conv]={id,name:name||(m[conv]&&m[conv].name)||''};rvSaveJson(rvPeerKey(),m);}
+window.riviorMarkRead=function(conv,iso){if(!conv||!cloudUser)return;const m=rvLoadJson(rvLrKey(),{});const t=iso||new Date().toISOString();if(!m[conv]||new Date(t)>new Date(m[conv])){m[conv]=t;rvSaveJson(rvLrKey(),m);}};
+async function rvResolveNames(ids){
+  const names=(window.__peerNames=window.__peerNames||{});
+  const miss=[...new Set((ids||[]).filter(Boolean))].filter(id=>!names[id]);
+  if(!miss.length)return;
+  try{
+    const r=await sb.rpc('rivior_chat_names',{ids:miss});
+    if(!r.error){(r.data||[]).forEach(p=>{names[p.id]=p.full_name||'';});return;}
+    const q=await sb.from('profiles').select('id,full_name').in('id',miss);
+    (q.data||[]).forEach(p=>{names[p.id]=p.full_name||'';});
+  }catch(_){}
+}
+async function rvFetchInboxRows(){
+  const q=await sb.from('chat_messages').select('id,conversation_id,sender_id,body,attachment_name,created_at').gte('created_at',chatCutoffIso()).order('created_at',{ascending:false}).limit(500);
+  if(q.error)return null;
+  const lr=rvLoadJson(rvLrKey(),{}),peers=rvPeerMap(),by=new Map();
+  for(const m of (q.data||[])){
+    let c=by.get(m.conversation_id);
+    if(!c){c={conv:m.conversation_id,last:m,unread:0,peerId:null};by.set(m.conversation_id,c);}
+    if(m.sender_id!==cloudUser.id){
+      if(!c.peerId)c.peerId=m.sender_id;
+      if(!lr[m.conversation_id]||new Date(m.created_at)>new Date(lr[m.conversation_id]))c.unread++;
+    }
+  }
+  for(const c of by.values()){if(!c.peerId&&peers[c.conv])c.peerId=peers[c.conv].id;}
+  return [...by.values()];
+}
+function rvFmtTime(d){const x=new Date(d),t=new Date();return x.toDateString()===t.toDateString()?x.toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit'}):x.toLocaleString('pt-PT',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});}
+function rvFilterInbox(term){
+  const t=String(term||'').trim().toLowerCase();
+  document.querySelectorAll('#cc-inbox .rv-inbox-row').forEach(el=>{el.style.display=(!t||(el.dataset.name||'').includes(t))?'':'none';});
+}
+window.riviorLoadInbox=async function(){
+  const box=$('cc-inbox');if(!box||!cloudUser||!sb)return;
+  let rows=await rvFetchInboxRows();
+  if(rows===null){box.innerHTML='';return;}
+  rows=rows.filter(r=>!(r.peerId&&window.__myBlocks&&window.__myBlocks.has(r.peerId)));
+  rows.sort((a,b)=>new Date(b.last.created_at)-new Date(a.last.created_at));
+  await rvResolveNames(rows.map(r=>r.peerId));
+  const names=window.__peerNames||{},peers=rvPeerMap();
+  if(!rows.length){box.innerHTML='<p class="ch-muted">Ainda sem conversas nos últimos 2 dias.</p>';return;}
+  const total=rows.reduce((a,r)=>a+r.unread,0);
+  box.innerHTML='<div class="ch-muted" style="margin:2px 0;font-weight:800">Conversas recentes'+(total?' · '+total+' por ler':'')+'</div>'+rows.map(r=>{
+    const name=names[r.peerId]||(peers[r.conv]&&peers[r.conv].name)||'Conversa';
+    const mine=r.last.sender_id===cloudUser.id;
+    let prev=String(r.last.body||'').replace(/\s+/g,' ').trim();if(!prev&&r.last.attachment_name)prev='📎 '+r.last.attachment_name;
+    if(prev.length>48)prev=prev.slice(0,48)+'…';
+    return '<button class="rv-inbox-row" data-name="'+safe(name.toLowerCase())+'" onclick="riviorOpenConversation(\''+safe(r.conv)+'\',\''+safe(r.peerId||'')+'\',\'\')"><span class="rv-av">'+safe((name[0]||'?').toUpperCase())+'</span><span class="rv-mid"><b'+(r.unread?'':' style="font-weight:600"')+'>'+safe(name)+'</b><span>'+(mine?'Tu: ':'')+safe(prev)+'</span></span><span class="rv-time">'+rvFmtTime(r.last.created_at)+(r.unread?'<br><span class="rv-unread">'+(r.unread>99?'99+':r.unread)+'</span>':'')+'</span></button>';
+  }).join('');
+  rvFilterInbox($('cc-search')?.value);
+};
+
+/* contadores */
+const RV_BADGE_SEL={
+  chat:['#cloud-hub .ch-tabs button[data-t="chat"]','.qa-chat'],
+  grades:['#cloud-hub .ch-tabs button[data-t="grades"]','.qa-score'],
+  notices:['#cloud-hub .ch-tabs button[data-t="notices"]','#cloud-notice-btn'],
+  management:['#cloud-hub .ch-tabs button[data-t="management"]'],
+  notif:['.qa-notif']
+};
+function rvSetBadge(key,n){
+  (RV_BADGE_SEL[key]||[]).forEach(sel=>document.querySelectorAll(sel).forEach(el=>{
+    let b=null;for(const ch of el.children){if(ch.classList&&ch.classList.contains('rv-badge')){b=ch;break;}}
+    if(!n){if(b)b.remove();return;}
+    if(!b){b=document.createElement('span');b.className='rv-badge';el.appendChild(b);}
+    const txt=n>99?'99+':String(n);if(b.textContent!==txt)b.textContent=txt;
+  }));
+}
+function rvSeen(kind){return rvLoadJson('rv_seen_'+kind+'_'+(cloudUser&&cloudUser.id),null);}
+function rvMarkSeen(kind,iso){rvSaveJson('rv_seen_'+kind+'_'+cloudUser.id,iso||new Date().toISOString());}
+window.riviorSeenGuardian=function(kind){rvMarkSeen(kind);window.riviorRefreshBadges();if(kind==='gm')$('g-cloud-data')?.scrollIntoView({behavior:'smooth'});};
+window.riviorRefreshBadges=async function(){
+  if(!sb||!cloudUser||!cloudProfile)return;
+  const role=cloudProfile.role,uid=cloudUser.id;
+  const res={chat:0,notices:0,grades:0,management:0,notif:0,gmsg:0};
+  try{
+    if(role!=='guardian'){
+      if(!window.__blocksLoaded)await window.riviorLoadBlocked();
+      const rows=await rvFetchInboxRows();
+      if(rows)res.chat=rows.filter(r=>!(r.peerId&&window.__myBlocks&&window.__myBlocks.has(r.peerId))).reduce((a,r)=>a+r.unread,0);
+    }
+  }catch(_){}
+  try{
+    const [aq,rq]=await Promise.all([sb.from('announcements').select('id,author_id'),sb.from('announcement_reads').select('announcement_id').eq('user_id',uid)]);
+    if(!aq.error){const read=new Set((rq.data||[]).map(r=>r.announcement_id));res.notices=(aq.data||[]).filter(a=>a.author_id!==uid&&!read.has(a.id)).length;}
+  }catch(_){}
+  try{
+    if(role==='student'||role==='guardian'){
+      let seen=rvSeen('grades');
+      if(!seen){const f=await sb.from('grades').select('created_at').order('created_at',{ascending:false}).limit(1);seen=(f.data&&f.data[0]&&f.data[0].created_at)||new Date().toISOString();rvMarkSeen('grades',seen);}
+      let gq=sb.from('grades').select('id').gt('created_at',seen);if(role==='student')gq=gq.eq('student_id',uid);
+      const g=await gq;if(!g.error)res.grades=(g.data||[]).length;
+    }
+  }catch(_){}
+  try{
+    const nq=await sb.from('rivior_notifications').select('id').eq('user_id',uid).is('read_at',null).limit(100);
+    if(!nq.error)res.notif=(nq.data||[]).length;
+  }catch(_){}
+  try{
+    if(role==='manager'){const m=await sb.from('guardian_student_links').select('id',{count:'exact',head:true}).eq('status','pending');if(!m.error)res.management=m.count||0;}
+  }catch(_){}
+  try{
+    if(role==='guardian'){
+      let seen=rvSeen('gm');
+      if(!seen){const f=await sb.from('guardian_messages').select('created_at').order('created_at',{ascending:false}).limit(1);seen=(f.data&&f.data[0]&&f.data[0].created_at)||new Date().toISOString();rvMarkSeen('gm',seen);}
+      const gm=await sb.from('guardian_messages').select('id').neq('sender_id',uid).gt('created_at',seen);
+      if(!gm.error)res.gmsg=(gm.data||[]).length;
+    }
+  }catch(_){}
+  window.__rvCounts=res;
+  rvSetBadge('chat',res.chat);rvSetBadge('notices',res.notices);rvSetBadge('grades',res.grades);rvSetBadge('management',res.management);
+  const total=res.notif+res.chat+res.notices+res.grades;
+  if(role==='student'){
+    rvSetBadge('notif',total);
+    const chip=$('notif-chip');if(chip){if(total){chip.textContent='🔔 '+total;chip.classList.remove('hidden');}else chip.classList.add('hidden');}
+  }
+  rvRenderLiveAlerts();
+  if(role==='guardian')rvRenderGuardianStrip(res);
+};
+function rvPlural(n,s,p){return n+' '+(n===1?s:p);}
+function rvRenderLiveAlerts(){
+  const list=$('rivior-notifications-list');if(!list)return;
+  const r=window.__rvCounts||{};let box=$('rv-live-alerts');const items=[];
+  if(r.grades)items.push(['📝','Notas online',rvPlural(r.grades,'nota nova publicada','notas novas publicadas'),"riviorCloudTab('grades')",'Ver notas']);
+  if(r.chat)items.push(['💬','Mensagens novas','Tens '+rvPlural(r.chat,'mensagem por ler','mensagens por ler'),"riviorCloudTab('chat')",'Abrir chat']);
+  if(r.notices)items.push(['📢','Comunicados',rvPlural(r.notices,'comunicado novo','comunicados novos'),"riviorCloudTab('notices')",'Ler']);
+  if(r.management)items.push(['👪','Pedidos de encarregados',rvPlural(r.management,'pedido à espera de validação','pedidos à espera de validação'),"riviorCloudTab('management')",'Validar']);
+  if(!items.length){if(box)box.remove();return;}
+  if(!box){box=document.createElement('div');box.id='rv-live-alerts';list.parentElement.insertBefore(box,list);}
+  box.innerHTML=items.map(i=>'<div class="rivior-notif-row unread"><div><b>'+i[0]+' '+i[1]+'</b><p>'+i[2]+'</p></div><button onclick="'+i[3]+'">'+i[4]+'</button></div>').join('');
+}
+function rvRenderGuardianStrip(r){
+  const host=$('guardian-summary');if(!host)return;
+  let s=$('rv-g-strip');
+  if(!s){s=document.createElement('div');s.id='rv-g-strip';s.style.cssText='display:flex;flex-wrap:wrap;gap:8px;margin-top:12px';host.appendChild(s);}
+  const chips=[];
+  if(r.gmsg)chips.push('<button class="rv-chip" onclick="riviorSeenGuardian(\'gm\')">💬 '+rvPlural(r.gmsg,'mensagem nova do professor','mensagens novas dos professores')+'</button>');
+  if(r.grades)chips.push('<button class="rv-chip" onclick="riviorSeenGuardian(\'grades\')">📝 '+rvPlural(r.grades,'nota nova online','notas novas online')+' · marcar como vista</button>');
+  if(r.notices)chips.push('<span class="rv-chip">📢 '+rvPlural(r.notices,'comunicado novo','comunicados novos')+'</span>');
+  s.innerHTML=chips.join('');
+}
+(function(){
+  const _tab=window.riviorCloudTab;
+  window.riviorCloudTab=async function(tab){
+    if(tab==='grades'&&cloudUser)rvMarkSeen('grades');
+    const r=await _tab.apply(this,arguments);
+    setTimeout(()=>window.riviorRefreshBadges(),400);
+    return r;
+  };
+  const _notif=window.riviorRefreshNotifications;
+  if(typeof _notif==='function')window.riviorRefreshNotifications=async function(){const r=await _notif.apply(this,arguments);rvRenderLiveAlerts();return r;};
+  let started=false;
+  function boot(){
+    if(started||!sb||!cloudUser||!cloudProfile)return;started=true;
+    window.riviorRefreshBadges();
+    try{sb.channel('rivior-inbox-'+cloudUser.id).on('postgres_changes',{event:'INSERT',schema:'public',table:'chat_messages'},()=>{window.riviorRefreshBadges();if($('cc-inbox'))window.riviorLoadInbox();}).subscribe();}catch(_){}
+    setInterval(()=>{if(!document.hidden)window.riviorRefreshBadges();},30000);
+  }
+  setInterval(boot,1500);
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden&&cloudUser)window.riviorRefreshBadges();});
+})();
+
 })();
 </script>
 
