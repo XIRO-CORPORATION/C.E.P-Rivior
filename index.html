@@ -1758,6 +1758,7 @@ async function doLogin(){
   saveStore(); openDash();
 }
 window.doLogin = doLogin;
+window.__localDoLogin = doLogin;
 
 async function createAccount(){
   var nome=el('in-nome').value.trim(), numero=el('in-numero').value.trim(), classe=el('in-classe').value,
@@ -6846,7 +6847,7 @@ window.MathJax = { tex: { inlineMath: [['$','$'], ['\\(','\\)']], displayMath: [
        let m=e?.message||'Erro desconhecido';
        if(/already registered|already been registered|user already exists/i.test(m))say('Este e-mail já tem uma conta. Usa Entrar ou recupera a senha.');
        else if(/fetch|network|failed to fetch|timeout|load failed/i.test(m))say('Não foi possível contactar o serviço de registo. Verifica a internet e tenta novamente.');
-       else if(/rate limit|too many|over_email_send_rate_limit|over_request_rate_limit|\b429\b/i.test(m+' '+(e?.code||'')+' '+(e?.status||'')))say('Muitas inscrições seguidas: o Supabase limita o número de emails de confirmação por hora. Espera cerca de 1 hora e tenta de novo, ou pede ao administrador para ajustar o envio de emails no Supabase.');
+       else if(/rate limit|too many|over_email_send_rate_limit|over_request_rate_limit|\b429\b/i.test(m+' '+(e?.code||'')+' '+(e?.status||'')))say('Muitas inscrições seguidas: o Supabase limita o número de emails de confirmação por hora. Espera cerca de 1 hora e tenta de novo, ou pede ao administrador para ajustar o envio de emails no Supabase. Detalhe: '+m+' '+(e&&e.code?'['+e.code+']':''));
        else if(/database error saving new user|unexpected_failure/i.test(m+' '+(e?.code||'')))say('A base de dados recusou estes dados (por exemplo número de aluno ou nome de utilizador já usado, ou classe/período inválidos). Confirma os dados ou fala com o administrador. Detalhe: '+m);
        else if(/password|weak/i.test(m))say('A senha não foi aceite. Usa uma senha mais forte (pelo menos 6 caracteres, com letras e números). Detalhe: '+m);
        else if(/invalid.*email|email.*invalid|email address.*not/i.test(m))say('Este endereço de email não foi aceite. Confirma que está certo, por exemplo nome@gmail.com.');
@@ -6998,6 +6999,8 @@ if(typeof prevOpen==='function')window.riviorCloudOpen=function(tab){const r=pre
   labels();
   window.doLogin=async function(){
     var creating=$('tabCriar')&&$('tabCriar').classList.contains('active');
+    var hidden=function(id){var e=$(id);return !e||e.classList.contains('hidden')};
+    function localNote(msg){try{var d=document.createElement('div');d.style.cssText='position:fixed;left:12px;right:12px;bottom:14px;z-index:99999;background:#fff;color:#0a2a5e;border-radius:14px;padding:12px 14px;font:600 14px/1.35 sans-serif;box-shadow:0 6px 24px rgba(0,0,0,.4)';d.textContent=msg;document.body.appendChild(d);setTimeout(function(){d.remove()},12000)}catch(x){}}
     if(creating){
       var role=$('in-account-type')?$('in-account-type').value:'student';
       if(role!=='student')return orig();
@@ -7010,14 +7013,26 @@ if(typeof prevOpen==='function')window.riviorCloudOpen=function(tab){const r=pre
       var r;try{r=await orig()}finally{$('in-email-signup').value=real}
       var m=curErr();
       if(/já tem uma conta/i.test(m)){err('Este nome de utilizador já está em uso. Escolhe outro.');return r}
-      if(/não foi aceite|inválid|invalid/i.test(m)){err('O Supabase recusou o endereço interno do nome de utilizador. Fala com o administrador. Detalhe: '+m)}
-      /* guarda o email real (se houver) como contacto, para entrar também com ele */
+      /* Se o Supabase estiver limitado/indisponível, cria a conta LOCAL neste telemóvel (sem email, sem limites) */
+      if(m&&/Muitas inscrições|contactar o serviço|indisponível|não foi aceite|inválid|invalid|Detalhe técnico/i.test(m)&&typeof window.__localDoLogin==='function'){
+        var e0=$('login-err');if(e0)e0.textContent='';
+        await window.__localDoLogin();
+        if(hidden('view-login')){localNote('Conta criada neste telemóvel (modo local). Podes estudar e fazer testes; as notas do professor e o chat só aparecem quando a conta online estiver disponível.');return}
+        return;
+      }
       if(real&&!m){try{var c=client();if(c&&c.auth){var s=await c.auth.getSession();if(s&&s.data&&s.data.session)await c.auth.updateUser({data:{contact_email:real}})}}catch(x){}}
       return r;
     }
     var v=($('in-username').value||'').trim();
     if(!v)return orig();
     if(v.indexOf('@')<0){
+      /* 1.º conta local deste telemóvel */
+      if(typeof window.__localDoLogin==='function'){
+        await window.__localDoLogin();
+        if(hidden('view-login'))return;
+        var e1=$('login-err');if(e1)e1.textContent='';
+      }
+      /* 2.º conta online (Supabase) */
       var typed=v;$('in-username').value=norm(v)+'@'+SYN;
       var r2;try{r2=await orig()}finally{$('in-username').value=typed}
       if(curErr())err('Nome de utilizador ou senha incorretos. Confirma e tenta de novo.');
@@ -7025,7 +7040,6 @@ if(typeof prevOpen==='function')window.riviorCloudOpen=function(tab){const r=pre
     }
     var typed2=v,r3=await orig();
     if(!curErr()||v.toLowerCase().endsWith('@'+SYN))return r3;
-    /* não entrou: talvez seja o email de contacto de um aluno que se registou só com utilizador */
     try{var c2=client();if(c2&&c2.rpc){var q=await c2.rpc('rivior_username_for_email',{p_email:v.toLowerCase()});var un=q&&q.data;if(un){$('in-username').value=norm(un)+'@'+SYN;try{await orig()}finally{if(curErr())$('in-username').value=typed2}}}}catch(x){}
     return r3;
   };
