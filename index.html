@@ -6997,6 +6997,23 @@ if(typeof prevOpen==='function')window.riviorCloudOpen=function(tab){const r=pre
     var n=document.querySelector('#signup-fields .form-note');if(n)n.textContent='Alunos: escolhe um nome de utilizador e uma senha; o email é opcional e não precisa de ser confirmado. Professores: usam email e senha; o administrador atribui as disciplinas.'
   }
   labels();
+  function LS(k,d){try{return JSON.parse(localStorage.getItem(k)||'')||d}catch(e){return d}}
+  function SS(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
+  /* Contas criadas só no telemóvel ficam "pendentes" e passam para o Supabase assim que ele aceitar: aí o professor vê o aluno, as notas, o chat e os anúncios */
+  async function trySync(u,pw){
+    var P=LS('rivior_pending',{});if(!P[u]||!pw)return false;var c=client();if(!c||!c.auth)return false;
+    var email=u+'@'+SYN;
+    try{
+      var r=await c.auth.signUp({email:email,password:pw,options:{data:P[u]}});
+      if(r.error){if(/already|registered/i.test(r.error.message||'')){r=await c.auth.signInWithPassword({email:email,password:pw});if(r.error)return false}else return false}
+      if(Array.isArray(r.data&&r.data.user&&r.data.user.identities)&&r.data.user.identities.length===0){r=await c.auth.signInWithPassword({email:email,password:pw});if(r.error)return false}
+      var user=r.data&&r.data.user;var sess=r.data&&r.data.session;
+      if(!sess){var s2=await c.auth.signInWithPassword({email:email,password:pw});if(s2.error)return false;user=s2.data.user}
+      delete P[u];SS('rivior_pending',P);var D=LS('rivior_synced',{});D[u]=1;SS('rivior_synced',D);
+      if(typeof window.enterCloud==='function'){await window.enterCloud(user)}else{location.reload()}
+      return true;
+    }catch(e){return false}
+  }
   window.doLogin=async function(){
     var creating=$('tabCriar')&&$('tabCriar').classList.contains('active');
     var hidden=function(id){var e=$(id);return !e||e.classList.contains('hidden')};
@@ -7016,8 +7033,9 @@ if(typeof prevOpen==='function')window.riviorCloudOpen=function(tab){const r=pre
       /* Se o Supabase estiver limitado/indisponível, cria a conta LOCAL neste telemóvel (sem email, sem limites) */
       if(m&&/Muitas inscrições|contactar o serviço|indisponível|não foi aceite|inválid|invalid|Detalhe técnico/i.test(m)&&typeof window.__localDoLogin==='function'){
         var e0=$('login-err');if(e0)e0.textContent='';
+        var meta={full_name:($('in-nome').value||'').trim(),role:'student',student_number:($('in-numero').value||'').trim(),class_level:Number($('in-classe').value),class_group:($('in-turma').value||'').trim(),period:$('in-periodo').value,sex:$('in-sexo').value,birth_date:$('in-nascimento').value,username:u};
         await window.__localDoLogin();
-        if(hidden('view-login')){localNote('Conta criada neste telemóvel (modo local). Podes estudar e fazer testes; as notas do professor e o chat só aparecem quando a conta online estiver disponível.');return}
+        if(hidden('view-login')){var PP=LS('rivior_pending',{});PP[u]=meta;SS('rivior_pending',PP);localNote('Conta criada neste telemóvel (modo local). Podes estudar e fazer testes; as notas do professor e o chat só aparecem quando a conta online estiver disponível.');return}
         return;
       }
       if(real&&!m){try{var c=client();if(c&&c.auth){var s=await c.auth.getSession();if(s&&s.data&&s.data.session)await c.auth.updateUser({data:{contact_email:real}})}}catch(x){}}
@@ -7026,10 +7044,11 @@ if(typeof prevOpen==='function')window.riviorCloudOpen=function(tab){const r=pre
     var v=($('in-username').value||'').trim();
     if(!v)return orig();
     if(v.indexOf('@')<0){
-      /* 1.º conta local deste telemóvel */
-      if(typeof window.__localDoLogin==='function'){
+      /* 1.º conta local deste telemóvel (se ainda não passou para o Supabase) */
+      var un0=norm(v),pw0=$('in-password').value||'';
+      if(typeof window.__localDoLogin==='function'&&!LS('rivior_synced',{})[un0]){
         await window.__localDoLogin();
-        if(hidden('view-login'))return;
+        if(hidden('view-login')){await trySync(un0,pw0);return}
         var e1=$('login-err');if(e1)e1.textContent='';
       }
       /* 2.º conta online (Supabase) */
