@@ -1,13 +1,13 @@
 {
-  "name": "Realeza do Saber — Plataforma de Estudo",
-  "short_name": "Realeza",
-  "description": "Plataforma de estudo do Complexo Escolar Privado Realeza do Saber",
+  "name": "Rivior — Plataforma de Estudo",
+  "short_name": "Rivior",
+  "description": "Plataforma de estudo do Complexo Escolar Privado Rivior",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#b3121f",
-  "theme_color": "#b3121f",
+  "background_color": "#002e6a",
+  "theme_color": "#002e6a",
   "lang": "pt-AO",
   "icons": [
     {
