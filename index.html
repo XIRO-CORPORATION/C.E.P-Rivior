@@ -4,6 +4,7 @@
 <script>
 /* ÚNICO sítio para trocar a ligação ao Supabase (URL + chave publishable/anon). */
 window.RIVIOR_CFG={url:"https://gxcjtxwyrzhmwywzwwmz.supabase.co",key:"sb_publishable_aQ03swREcTec_hyYNYf8Vg_zoPjS-cp"};
+try{if(localStorage.getItem("rivior_local")==="1"){Object.keys(localStorage).forEach(function(k){if(/^sb-.*-auth-token/.test(k))localStorage.removeItem(k)})}}catch(e){}
 </script>
 
 <meta charset="UTF-8">
@@ -1252,17 +1253,24 @@ function mergeMensagensGenericas(remoteArr, localArr){ var byId={}; (remoteArr||
 
 function timeoutPromise(ms){ return new Promise(function(resolve){ setTimeout(resolve, ms); }); }
 
+var RV_SYNC_VER = 0, RV_SYNC_BUSY = false;
+function rvSyncClient(){
+  try{
+    if(!window.__rvSyncClient) window.__rvSyncClient = window.supabase.createClient(window.RIVIOR_CFG.url, window.RIVIOR_CFG.key, { auth:{ persistSession:false, autoRefreshToken:false, detectSessionInUrl:false } });
+    return window.__rvSyncClient;
+  }catch(e){ return null; }
+}
 async function cloudPull(){
-  if(!CLOUD_BIN_ID) return;
+  var c = rvSyncClient(); if(!c) return;
   try{
     var res = await Promise.race([
-      fetch(CLOUD_API + '/' + CLOUD_BIN_ID + '/latest', { headers: { 'X-Master-Key': CLOUD_KEY } }),
-      timeoutPromise(5000).then(function(){ throw new Error('tempo esgotado'); })
+      c.rpc('rivior_sync_pull'),
+      timeoutPromise(6000).then(function(){ throw new Error('tempo esgotado'); })
     ]);
-    if(!res || !res.ok) return;
-    var json = await res.json();
-    var remote = json && json.record;
-    if(!remote) return;
+    if(!res || res.error || !res.data) return;
+    RV_SYNC_VER = Number(res.data.version) || 0;
+    var remote = res.data.data;
+    if(!remote || typeof remote !== 'object') return;
     store.contas = Object.assign({}, remote.contas || {}, store.contas || {});
     store.alunos = mergeAlunos(remote.alunos, store.alunos);
     store.notificacoes = mergeNotifs(remote.notificacoes, store.notificacoes);
@@ -1270,15 +1278,34 @@ async function cloudPull(){
     store.encarregados = mergeObjects(remote.encarregados, store.encarregados);
     store.mensagensEncarregados = mergeMensagensGenericas(remote.mensagensEncarregados, store.mensagensEncarregados);
     saveStore();
-  }catch(e){ /* sem rede ou sem sincronização ainda — segue com os dados locais */ }
+  }catch(e){ /* sem rede ou SQL de sincronização ainda não executado — segue com os dados locais */ }
 }
-
 async function cloudPush(){
-  if(!CLOUD_BIN_ID) return;
+  var c = rvSyncClient(); if(!c) return;
+  if(RV_SYNC_BUSY) return;
+  RV_SYNC_BUSY = true;
   try{
-    await fetch(CLOUD_API + '/' + CLOUD_BIN_ID, { method: 'PUT', headers: cloudHeaders(), body: JSON.stringify(sharedSnapshot()) });
+    for(var k=0;k<3;k++){
+      var r = await c.rpc('rivior_sync_push', { p_data: sharedSnapshot(), p_base: RV_SYNC_VER });
+      if(r && !r.error && typeof r.data === 'number'){ RV_SYNC_VER = r.data; break; }
+      RV_SYNC_BUSY = false; await cloudPull(); RV_SYNC_BUSY = true;   /* alguém gravou antes: junta e tenta de novo */
+    }
   }catch(e){ /* falha silenciosa — tenta-se de novo na próxima ação */ }
+  finally{ RV_SYNC_BUSY = false; }
 }
+/* actualização automática (professor vê novos alunos/mensagens; aluno recebe respostas) */
+setInterval(async function(){
+  if(document.hidden) return;
+  var typing = document.activeElement && /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName);
+  var before = JSON.stringify([store.mensagensAlunos, store.notificacoes, Object.keys(store.alunos||{}).length]);
+  await cloudPull();
+  var after = JSON.stringify([store.mensagensAlunos, store.notificacoes, Object.keys(store.alunos||{}).length]);
+  if(before === after || typing) return;
+  try{
+    var tp = el('view-teacher'); if(tp && !tp.classList.contains('hidden')) renderTeacherPanel();
+    var cm = el('student-chat-modal'); if(cm && !cm.classList.contains('hidden')) renderStudentNotifications();
+  }catch(e){}
+}, 20000);
 
 async function cloudInitialize(){
   if(CLOUD_BIN_ID){ alert('A sincronização já está configurada.'); return; }
@@ -5604,7 +5631,7 @@ function addCloudEntryPoints(){
   if(!$('rivior-cloud-css')){const st=document.createElement('style');st.id='rivior-cloud-css';st.textContent=`#cloud-hub{position:fixed;inset:0;z-index:10000;background:rgba(2,6,16,.88);backdrop-filter:blur(12px);overflow:auto;padding:18px 12px calc(28px + env(safe-area-inset-bottom));color:#eef3ff;font-family:inherit}#cloud-hub .ch-wrap{max-width:980px;margin:auto}#cloud-hub .ch-card{background:#0c1730;border:1px solid #293957;border-radius:16px;padding:14px;margin:10px 0}#cloud-hub h2,#cloud-hub h3{margin:4px 0 10px}#cloud-hub input,#cloud-hub select,#cloud-hub textarea{width:100%;box-sizing:border-box;margin:5px 0 10px;padding:10px;border-radius:10px;border:1px solid #344666;background:#071124;color:#fff;font:inherit}#cloud-hub button{cursor:pointer;border:1px solid #3a4e72;border-radius:10px;padding:9px 12px;background:#142849;color:#fff;font-weight:800}#cloud-hub .ch-primary{background:linear-gradient(135deg,var(--blue-d),var(--blue));border-color:var(--blue)}#cloud-hub .ch-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px}#cloud-hub .ch-msg{padding:9px 11px;margin:7px 0;border-radius:12px;max-width:88%;background:#172746;overflow-wrap:anywhere}#cloud-hub .ch-msg.mine{margin-left:auto;background:linear-gradient(135deg,var(--blue-d),#1b2f55)}#cloud-hub .ch-muted{color:#9aabc8;font-size:12px}#cloud-hub .ch-row{display:flex;gap:8px;flex-wrap:wrap}#cloud-hub .ch-row>*{flex:1}#cloud-hub .ch-table{width:100%;border-collapse:collapse;font-size:13px}#cloud-hub .ch-table td,#cloud-hub .ch-table th{padding:8px;border-bottom:1px solid #263653;text-align:left}#cloud-hub .ch-alert{color:#ffaaa8;font-weight:900}#cloud-hub{height:100vh;height:100dvh;background:radial-gradient(circle at 50% -10%,rgba(120,150,255,.10),transparent 40%),linear-gradient(rgba(140,170,220,.035) 1px,transparent 1px) 0 0/36px 36px,linear-gradient(90deg,rgba(140,170,220,.03) 1px,transparent 1px) 0 0/36px 36px,rgba(2,5,12,.96);-webkit-overflow-scrolling:touch}#cloud-hub .ch-card{background:linear-gradient(180deg,rgba(16,28,48,.92),rgba(7,14,26,.95));border:1px solid rgba(150,180,215,.14);box-shadow:0 14px 40px rgba(0,0,0,.28);backdrop-filter:blur(14px)}#cloud-hub button{transition:transform .15s,border-color .15s,background .15s;min-height:40px}#cloud-hub button:active{transform:scale(.97)}#cloud-hub .ch-tabs button.on{border-color:var(--blue);background:rgba(120,150,255,.14);box-shadow:0 0 18px rgba(120,150,255,.18)}#cloud-hub .ch-kpis{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}#cloud-hub .ch-kpis .ch-card{margin:0}#cloud-hub .ch-kpi{font-size:28px;font-weight:950;letter-spacing:-.5px;margin:2px 0}#cloud-hub .ch-stu{padding:12px;margin:8px 0;border-radius:14px;border:1px solid rgba(150,180,215,.14);background:rgba(8,16,30,.78)}#cloud-hub .ch-stu.low{border-color:rgba(114,169,251,.45);box-shadow:inset 3px 0 0 #ff6f66}#cloud-hub .ch-badge{display:inline-block;margin-left:8px;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:900;background:rgba(255,111,102,.16);color:#acccfd;border:1px solid rgba(255,111,102,.4)}#cloud-hub .ch-bar{height:7px;border-radius:99px;background:rgba(255,255,255,.08);overflow:hidden;margin:8px 0 4px}#cloud-hub .ch-bar i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,var(--blue),#c2d3ed,#49d49a)}#cloud-hub .ch-stu .ch-row{margin-top:8px}#cloud-hub .nt-social{display:flex;gap:7px;flex-wrap:wrap;margin:10px 0}#cloud-hub .nt-social button{font-size:12px;padding:7px 10px;min-height:34px}#cloud-hub .nt-social button.active{border-color:#cad9f0;background:rgba(202,217,240,.16);color:#cad9f0}#cloud-hub .nt-comments{border-top:1px solid #263653;margin-top:10px;padding-top:8px}#cloud-hub .nt-comment{padding:7px 0;border-bottom:1px solid rgba(255,255,255,.06);font-size:12px;overflow-wrap:anywhere}#cloud-hub .nt-comment-input{display:flex;gap:6px;align-items:center}#cloud-hub .nt-comment-input input{flex:1;min-width:0;margin:5px 0}#cloud-hub .nt-detail{font-size:12px;color:#9aabc8;margin-top:6px}#cloud-hub .ch-stu-g{font-size:13px;margin:6px 0;color:#d6e0f2}#cloud-hub .ch-stu-g b.lo{color:#96bffc}@media(max-width:520px){#cloud-hub{padding:10px 8px calc(24px + env(safe-area-inset-bottom))}}`;document.head.appendChild(st);}
   if(!$('cloud-hub')){const d=document.createElement('div');d.id='cloud-hub';d.className='hidden';d.innerHTML=`<div class="ch-wrap"><div class="ch-row" style="align-items:center;justify-content:space-between"><div><div style="color:#cad9f0;font-size:11px;font-weight:900;letter-spacing:1.5px">RIVIOR · NUVEM</div><h2 id="ch-title">Centro académico</h2><div id="ch-status" class="ch-muted">A verificar ligação…</div></div><div class="ch-row" style="flex:none;gap:6px"><button id="ch-close" onclick="riviorCloudClose()">Fechar ✕</button><button onclick="riviorCloudLogout()">Sair</button></div></div><div class="ch-row ch-tabs" style="margin:12px 0"><button id="ch-tab-students" data-t="students" style="display:none" onclick="riviorCloudTab('students')">Alunos e alertas</button><button id="ch-tab-directory" data-t="directory" style="display:none" onclick="riviorCloudTab('directory')">Pesquisar aluno</button><button id="ch-tab-behavior" data-t="behavior" style="display:none" onclick="riviorCloudTab('behavior')">Comportamento</button><button id="ch-tab-attendance" data-t="attendance" style="display:none" onclick="riviorCloudTab('attendance')">📅 Assiduidade</button><button id="ch-tab-management" data-t="management" style="display:none" onclick="riviorCloudTab('management')">Gestão escolar</button><button data-t="grades" onclick="riviorCloudTab('grades')">Notas e médias</button><button data-t="chat" onclick="riviorCloudTab('chat')">Chat e ficheiros</button><button data-t="progress" onclick="riviorCloudTab('progress')">Progresso</button><button data-t="notices" onclick="riviorCloudTab('notices')">📢 Comunicados</button></div><div id="ch-content"></div></div>`;document.body.appendChild(d);}
   // Cloud functions are intentionally distinct from local demo widgets.
-  const oldOpen=window.openTeacherPanel; if(oldOpen&&!window.__cloudTeacherWrapped){window.__cloudTeacherWrapped=true;window.openTeacherPanel=function(){if(cloudProfile&&cloudProfile.role==='teacher'){riviorCloudOpen('students');return;}oldOpen();};}
+  const oldOpen=window.openTeacherPanel; if(oldOpen&&!window.__cloudTeacherWrapped){window.__cloudTeacherWrapped=true;window.__localTeacherPanel=oldOpen;window.openTeacherPanel=function(){if(cloudProfile&&cloudProfile.role==='teacher'){riviorCloudOpen('students');return;}oldOpen();};}
   if(window.openDash&&!window.__cloudDashWrapped){const oldDash=window.openDash;window.__cloudDashWrapped=true;window.openDash=function(){oldDash();setTimeout(()=>{syncLearningProgress();syncCloudAvg();},500);};}
   if(window.finishQuiz&&!window.__cloudQuizWrapped){const oldQuiz=window.finishQuiz;window.__cloudQuizWrapped=true;window.finishQuiz=function(){oldQuiz();try{if(typeof updateRiviorDashboardProgress==='function')updateRiviorDashboardProgress();}catch(_){}setTimeout(syncLearningProgress,500);};}
   {const qc=document.querySelector('.qa-chat');if(qc)qc.setAttribute('onclick',"riviorCloudOpen('chat')");const qs=document.querySelector('.qa-score');if(qs)qs.setAttribute('onclick',"riviorCloudOpen('grades')");const qn=document.querySelector('.qa-notif');if(qn)qn.setAttribute('onclick',"riviorCloudOpen('notices')");}
@@ -6754,7 +6781,7 @@ function rvRenderGuardianStrip(r){
 /* ETAPA 15 — Conta híbrida ADM + docente de Física, sem alterar o papel manager. */
 (function(){
   const style=document.createElement('style');style.textContent='#ch-tab-my-classes{border-color:rgba(202,217,240,.65)!important;color:#dce6f5!important}';document.head.appendChild(style);
-  function ensureMyClassesTab(){const tabs=document.querySelector('#cloud-hub .ch-tabs');const ok=!!(typeof cloudProfile!=='undefined'&&cloudProfile&&['manager','teacher'].includes(cloudProfile.role));const ex=document.getElementById('ch-tab-my-classes');if(!ok){if(ex)ex.remove();return;}if(!tabs||ex)return;const b=document.createElement('button');b.id='ch-tab-my-classes';b.dataset.t='my-classes';b.textContent='⚛️ Minhas turmas de Física';b.onclick=()=>window.riviorCloudTab('my-classes');tabs.insertBefore(b,tabs.firstChild);}
+  function ensureMyClassesTab(){const tabs=document.querySelector('#cloud-hub .ch-tabs');const __p=window.RIVIOR_CLOUD&&window.RIVIOR_CLOUD.profile;const ok=!!(__p&&['manager','teacher'].includes(__p.role));const ex=document.getElementById('ch-tab-my-classes');if(!ok){if(ex)ex.remove();return;}if(!tabs||ex)return;const b=document.createElement('button');b.id='ch-tab-my-classes';b.dataset.t='my-classes';b.textContent='⚛️ Minhas turmas de Física';b.onclick=()=>window.riviorCloudTab('my-classes');tabs.insertBefore(b,tabs.firstChild);}
   const oldEnter=window.enterCloud;
   // enterCloud is a local lexical function, so we add the hybrid entry points after the hub exists.
   const observer=new MutationObserver(()=>{if(document.getElementById('cloud-hub')){ensureMyClassesTab();observer.disconnect();}});observer.observe(document.documentElement,{childList:true,subtree:true});
@@ -6997,6 +7024,43 @@ if(typeof prevOpen==='function')window.riviorCloudOpen=function(tab){const r=pre
     var n=document.querySelector('#signup-fields .form-note');if(n)n.textContent='Alunos: escolhe um nome de utilizador e uma senha; o email é opcional e não precisa de ser confirmado. Professores: usam email e senha; o administrador atribui as disciplinas.'
   }
   labels();
+  /* ===== modo local: o aluno nunca deve herdar a sessão de professor deste telemóvel ===== */
+  function isLocal(){try{return localStorage.getItem('rivior_local')==='1'}catch(e){return false}}
+  async function localModeOn(){
+    try{localStorage.setItem('rivior_local','1')}catch(e){}
+    try{var c=client();if(c&&c.auth)await c.auth.signOut({scope:'local'})}catch(e){}
+    try{window.RIVIOR_CLOUD=null}catch(e){}
+    isolate();
+  }
+  function localModeOff(){try{localStorage.removeItem('rivior_local')}catch(e){}}
+  function isolate(){
+    if(!isLocal())return;
+    try{var pf=window.__APP&&window.__APP.getStore().perfil;if(!pf||pf.role!=='student')return}catch(e){return}
+    ['cloud-student-btn','cloud-notice-btn'].forEach(function(id){var e=$(id);if(e)e.remove()});
+    var m={'.qa-chat':"openStudentChat()",'.qa-score':"openDashboardSection('performance-card')",'.qa-notif':"openDashboardSection('notifications-card')"};
+    Object.keys(m).forEach(function(s){var e=document.querySelector(s);if(e&&/riviorCloud/.test(e.getAttribute('onclick')||''))e.setAttribute('onclick',m[s])});
+    var h=$('cloud-hub');if(h&&!h.classList.contains('hidden'))h.classList.add('hidden');
+  }
+  setInterval(isolate,700);
+  var oLogout=window.logout;
+  if(typeof oLogout==='function')window.logout=async function(){localModeOff();return oLogout.apply(this,arguments)};
+  /* ===== professor/gestor: acesso ao painel local (alunos sem conta online) ===== */
+  function openLocalPanel(){
+    try{window.riviorCloudClose()}catch(e){}
+    try{var s=window.__APP.getStore();var pr=window.RIVIOR_CLOUD&&window.RIVIOR_CLOUD.profile;s.perfil={nome:(pr&&pr.full_name)||'Professor',role:'teacher'};window.__APP.saveStore()}catch(e){}
+    Promise.resolve(window.cloudPull&&window.cloudPull()).catch(function(){}).then(function(){try{window.__localTeacherPanel()}catch(e){alert('Não foi possível abrir o painel local: '+e.message)}});
+  }
+  function backOnline(){var v=$('view-teacher');if(v)v.classList.add('hidden');try{window.riviorCloudOpen('students')}catch(e){}}
+  setInterval(function(){
+    var pr=window.RIVIOR_CLOUD&&window.RIVIOR_CLOUD.profile;
+    var staff=!!(pr&&(pr.role==='teacher'||pr.role==='manager'));
+    var tabs=document.querySelector('#cloud-hub .ch-tabs');
+    if(staff&&tabs&&!$('ch-tab-local')){var b=document.createElement('button');b.id='ch-tab-local';b.textContent='👥 Alunos locais';b.onclick=openLocalPanel;tabs.insertBefore(b,tabs.firstChild)}
+    var tp=$('view-teacher'),vis=tp&&!tp.classList.contains('hidden');
+    var bb=$('rv-back-online');
+    if(staff&&vis&&!bb){bb=document.createElement('button');bb.id='rv-back-online';bb.textContent='☁️ Painel online';bb.style.cssText='position:fixed;left:10px;top:10px;z-index:9999;padding:8px 12px;border-radius:99px;border:1px solid rgba(255,255,255,.5);background:rgba(10,42,94,.92);color:#fff;font:700 13px sans-serif';bb.onclick=backOnline;document.body.appendChild(bb)}
+    if(bb&&!(staff&&vis))bb.remove();
+  },900);
   function LS(k,d){try{return JSON.parse(localStorage.getItem(k)||'')||d}catch(e){return d}}
   function SS(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
   /* Contas criadas só no telemóvel ficam "pendentes" e passam para o Supabase assim que ele aceitar: aí o professor vê o aluno, as notas, o chat e os anúncios */
@@ -7009,7 +7073,7 @@ if(typeof prevOpen==='function')window.riviorCloudOpen=function(tab){const r=pre
       if(Array.isArray(r.data&&r.data.user&&r.data.user.identities)&&r.data.user.identities.length===0){r=await c.auth.signInWithPassword({email:email,password:pw});if(r.error)return false}
       var user=r.data&&r.data.user;var sess=r.data&&r.data.session;
       if(!sess){var s2=await c.auth.signInWithPassword({email:email,password:pw});if(s2.error)return false;user=s2.data.user}
-      delete P[u];SS('rivior_pending',P);var D=LS('rivior_synced',{});D[u]=1;SS('rivior_synced',D);
+      delete P[u];SS('rivior_pending',P);localModeOff();var D=LS('rivior_synced',{});D[u]=1;SS('rivior_synced',D);
       if(typeof window.enterCloud==='function'){await window.enterCloud(user)}else{location.reload()}
       return true;
     }catch(e){return false}
@@ -7035,7 +7099,7 @@ if(typeof prevOpen==='function')window.riviorCloudOpen=function(tab){const r=pre
         var e0=$('login-err');if(e0)e0.textContent='';
         var meta={full_name:($('in-nome').value||'').trim(),role:'student',student_number:($('in-numero').value||'').trim(),class_level:Number($('in-classe').value),class_group:($('in-turma').value||'').trim(),period:$('in-periodo').value,sex:$('in-sexo').value,birth_date:$('in-nascimento').value,username:u};
         await window.__localDoLogin();
-        if(hidden('view-login')){var PP=LS('rivior_pending',{});PP[u]=meta;SS('rivior_pending',PP);localNote('Conta criada neste telemóvel (modo local). Podes estudar e fazer testes; as notas do professor e o chat só aparecem quando a conta online estiver disponível.');return}
+        if(hidden('view-login')){await localModeOn();var PP=LS('rivior_pending',{});PP[u]=meta;SS('rivior_pending',PP);localNote('Conta criada neste telemóvel (modo local). Podes estudar e fazer testes; as notas do professor e o chat só aparecem quando a conta online estiver disponível.');return}
         return;
       }
       if(real&&!m){try{var c=client();if(c&&c.auth){var s=await c.auth.getSession();if(s&&s.data&&s.data.session)await c.auth.updateUser({data:{contact_email:real}})}}catch(x){}}
@@ -7048,7 +7112,7 @@ if(typeof prevOpen==='function')window.riviorCloudOpen=function(tab){const r=pre
       var un0=norm(v),pw0=$('in-password').value||'';
       if(typeof window.__localDoLogin==='function'&&!LS('rivior_synced',{})[un0]){
         await window.__localDoLogin();
-        if(hidden('view-login')){await trySync(un0,pw0);return}
+        if(hidden('view-login')){await localModeOn();await trySync(un0,pw0);return}
         var e1=$('login-err');if(e1)e1.textContent='';
       }
       /* 2.º conta online (Supabase) */
@@ -7058,6 +7122,7 @@ if(typeof prevOpen==='function')window.riviorCloudOpen=function(tab){const r=pre
       return r2;
     }
     var typed2=v,r3=await orig();
+    if(!curErr())localModeOff();
     if(!curErr()||v.toLowerCase().endsWith('@'+SYN))return r3;
     try{var c2=client();if(c2&&c2.rpc){var q=await c2.rpc('rivior_username_for_email',{p_email:v.toLowerCase()});var un=q&&q.data;if(un){$('in-username').value=norm(un)+'@'+SYN;try{await orig()}finally{if(curErr())$('in-username').value=typed2}}}}catch(x){}
     return r3;
